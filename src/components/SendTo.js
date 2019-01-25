@@ -30,6 +30,7 @@ export default function SendTo ({ ein }) {
       })
   }
 
+  // TODO move this up into the Home component and pass it down as a prop
   function updateSnowflakeBalance () {
     snowflake.functions.deposits(ein)
       .then(latestSnowflakeBalance => {

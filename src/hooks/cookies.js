@@ -8,7 +8,7 @@ export function useInitializeCookie (cookies) {
 
   function initializeCookie () {
     const wallet = ethers.Wallet.createRandom()
-    cookies.set(cookieName, wallet.privateKey)
+    cookies.set(cookieName, wallet.privateKey, { secure: true, sameSite: 'strict' })
   }
 
   useEffect(() => {
