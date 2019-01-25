@@ -2,6 +2,3 @@
   command = "yarn build"
   functions = "lambda-build"
   publish = "build"
-[build.environment]
-  REACT_APP_INFURA_URL = ""
-  REACT_APP_PRIVATE_KEY = ""

@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-netlify.toml
+netlify.toml.local
 
 # dependencies
 /node_modules
