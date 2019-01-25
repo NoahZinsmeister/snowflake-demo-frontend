@@ -1,0 +1,23 @@
+import { ethers } from 'ethers'
+
+export async function handler (event, context) {
+  try {
+    const provider = new ethers.providers.JsonRpcProvider(process.env.REACT_APP_INFURA_URL)
+    const wallet = new ethers.Wallet(process.env.REACT_APP_PRIVATE_KEY, provider)
+
+    const { to, transactionData } = JSON.parse(event.body)
+
+    const transaction = await wallet.sendTransaction({ to, data: transactionData })
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ transactionHash: transaction.hash })
+    }
+  } catch (error) {
+    console.log(error)
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ message: error.toString() })
+    }
+  }
+}

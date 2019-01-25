@@ -43,13 +43,3 @@ export function useEIN () {
 
   return [ein, fetchEIN]
 }
-
-export function useSendingWallet () {
-  const context = useWeb3Context()
-  // we don't need to worry about re-renders because we keyed the cookie context
-  const sendingWallet = useRef(
-    new ethers.Wallet('0x0000000000000000000000000000000000000000000000000000000000000123').connect(context.library)
-  )
-
-  return sendingWallet.current
-}

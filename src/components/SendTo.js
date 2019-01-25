@@ -5,7 +5,7 @@ import { useWeb3Context, useNetworkEffect } from 'web3-react/hooks'
 import { toDecimal, fromDecimal } from 'web3-react/utilities'
 import { ethers } from 'ethers'
 
-import { useWallet, useSendingWallet, useContract } from '../hooks/general'
+import { useWallet, useContract } from '../hooks/general'
 
 export default function SendTo ({ ein }) {
   const [recipientEIN, setRecipientEIN] = useState({value: '', error: null})
@@ -18,7 +18,6 @@ export default function SendTo ({ ein }) {
   const context = useWeb3Context()
 
   const wallet = useWallet()
-  const sendingWallet = useSendingWallet()
   const snowMoResolver = useContract("SnowMoResolver")
   const _1484 = useContract("1484")
   const snowflake = useContract("Snowflake")
@@ -62,7 +61,11 @@ export default function SendTo ({ ein }) {
 
   useEffect(() => {
     if (transactionHash) {
-      context.library.on(transactionHash, () => context.forceAccountReRender())
+      context.library.on(transactionHash, () => {
+        setRecipientEIN({ value: '', error: null })
+        setRecipientAmount({ value: '', error: null })
+        context.forceAccountReRender()
+      })
       return () => context.library.removeAllListeners(transactionHash)
     }
   }, [transactionHash])
@@ -92,11 +95,16 @@ export default function SendTo ({ ein }) {
 
     const permission = await getSignedPermission(transactionBytes)
 
-    snowflake.connect(sendingWallet).functions.allowAndCallDelegated(
+    const to = snowflake.address
+    const transactionData = snowflake.interface.functions.allowAndCallDelegated.encode([
       snowMoResolver.address, fromDecimal(recipientAmount.value, 18), transactionBytes, wallet.address,
       permission.v, permission.r, permission.s
-    )
-      .then(transaction => setTransactionHash(transaction.hash))
+    ])
+
+    fetch('/.netlify/functions/provider', { method: 'POST', body: JSON.stringify({ to, transactionData }) })
+      .then(response => response.json())
+      .then(json => setTransactionHash(json.transactionHash))
+      .catch(error => console.error(error))
   }
 
   function validateCurrentRecipientEIN () {

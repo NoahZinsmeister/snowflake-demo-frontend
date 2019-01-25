@@ -12,7 +12,7 @@ import { useEIN } from './hooks/general'
 import Landing from './pages/Landing'
 import Home from './pages/Home'
 
-const infura = new InfuraConnector({ providerURL: 'https://rinkeby.infura.io/v3/3f0fa5d9c4064d6e8427efac291d66df' })
+const infura = new InfuraConnector({ providerURL: process.env.REACT_APP_INFURA_URL })
 const connectors = { infura }
 
 if (process.env.NODE_ENV === 'production')

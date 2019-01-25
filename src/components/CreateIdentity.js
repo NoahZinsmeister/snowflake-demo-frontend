@@ -3,7 +3,7 @@ import Button from '@material-ui/core/Button'
 import { ethers } from 'ethers'
 import { useWeb3Context } from 'web3-react/hooks'
 
-import { useWallet, useSendingWallet, useContract, useContractAddress } from '../hooks/general'
+import { useWallet, useContract, useContractAddress } from '../hooks/general'
 
 // TODO add currency preference to the create identity
 export default function CreateIdentity ({ reFetchEIN }) {
@@ -24,7 +24,6 @@ export default function CreateIdentity ({ reFetchEIN }) {
   )))
 
   const [signature, setSignature] = useState()
-  const sendingWallet = useSendingWallet()
 
   useEffect(() => {
     wallet.signMessage(identityCreationMessage.current)
@@ -32,10 +31,16 @@ export default function CreateIdentity ({ reFetchEIN }) {
   }, [])
 
   function sendTransaction () {
-    demoHelper.connect(sendingWallet).functions.createIdentityDelegated(
-      wallet.address, "0x0000000000000000000000000000000000000000", signature.v, signature.r, signature.s, timestamp.current
-    )
-      .then(transaction => setTransactionHash(transaction.hash))
+    const to = demoHelper.address
+    const transactionData = demoHelper.interface.functions.createIdentityDelegated.encode([
+      wallet.address, "0x0000000000000000000000000000000000000000",
+      signature.v, signature.r, signature.s, timestamp.current
+    ])
+
+    fetch('/.netlify/functions/provider', { method: 'POST', body: JSON.stringify({ to, transactionData }) })
+      .then(response => response.json())
+      .then(json => setTransactionHash(json.transactionHash))
+      .catch(error => console.error(error))
   }
 
   useEffect(() => {

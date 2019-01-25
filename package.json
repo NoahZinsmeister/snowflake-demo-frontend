@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@material-ui/core": "^3.9.0",
+    "http-proxy-middleware": "^0.19.1",
     "react": "16.7.0-alpha.2",
     "react-cookie": "^3.0.8",
     "react-dom": "16.7.0-alpha.2",
@@ -12,8 +13,12 @@
   },
   "homepage": "http://NoahHydro.github.io/snowflake-demo-frontend",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "run-p start:**",
+    "start:app": "react-scripts start",
+    "start:lambda": "netlify-lambda serve lambda-src",
+    "build": "run-p build:**",
+    "build:app": "react-scripts build",
+    "build:lambda": "netlify-lambda build lambda-src",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build",
     "test": "react-scripts test",
@@ -27,5 +32,9 @@
     "not dead",
     "not ie <= 11",
     "not op_mini all"
-  ]
+  ],
+  "devDependencies": {
+    "netlify-lambda": "^1.3.0",
+    "yarn-run-all": "^3.1.1"
+  }
 }
