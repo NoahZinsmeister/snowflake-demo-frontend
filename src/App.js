@@ -1,28 +1,70 @@
-import React, { Component } from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React, { Fragment, useEffect } from 'react'
+import Web3Provider from 'web3-react'
+import { InfuraConnector } from 'web3-react/connectors'
+import { useWeb3Context } from 'web3-react/hooks'
+import { CookiesProvider, withCookies } from 'react-cookie'
+import { ethers } from 'ethers'
 
-class App extends Component {
-  render() {
-    return (
-      <div className="App">
-        <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <p>
-            Edit <code>src/App.js</code> and save to reload.
-          </p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
-        </header>
-      </div>
-    );
-  }
+import { cookieName, CookieContext } from './contexts'
+import { useInitializeCookie } from './hooks/cookies'
+import { useEIN } from './hooks/general'
+
+import Landing from './pages/Landing'
+import Home from './pages/Home'
+
+const infura = new InfuraConnector({ providerURL: 'https://rinkeby.infura.io/v3/3f0fa5d9c4064d6e8427efac291d66df' })
+const connectors = { infura }
+
+if (process.env.NODE_ENV === 'production')
+  ethers.errors.setLogLevel("error")
+else
+  ethers.errors.setLogLevel("error")
+
+function _Initializer ({ children, cookies }) {
+  const context = useWeb3Context()
+  const [cookieInitialized, cookieValue, resetCookie] = useInitializeCookie(cookies)
+
+  // set up connector one-time
+  useEffect(() => {
+    context.setConnector('infura').catch(e => console.error('Error initializing Infura.', e))
+  }, [])
+
+  return !(cookieInitialized && context.active) ? null : (
+    <CookieContext.Provider
+      value={{
+        [cookieName]: cookieValue,
+        resetCookie: resetCookie
+      }}
+    >
+      <CookieContext.Consumer>
+        {context =>
+          <Fragment key={context[cookieName]}>
+            {children}
+          </Fragment>
+        }
+      </CookieContext.Consumer>
+    </CookieContext.Provider>
+  )
 }
 
-export default App;
+const Initializer = withCookies(_Initializer)
+
+function Router () {
+  const [ein, reFetchEIN] = useEIN()
+
+  if (ein === undefined) return null
+  if (ein === null) return <Landing reFetchEIN={reFetchEIN} />
+  return <Home ein={ein} />
+}
+
+export default function App () {
+  return (
+    <Web3Provider connectors={connectors} libraryName="ethers.js">
+      <CookiesProvider>
+        <Initializer>
+          <Router />
+        </Initializer>
+      </CookiesProvider>
+    </Web3Provider>
+  )
+}
