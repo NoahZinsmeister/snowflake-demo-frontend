@@ -1,29 +1,46 @@
-import { useState, useEffect } from 'react'
+import { useReducer, useEffect } from 'react'
 import { ethers } from 'ethers'
 
-import { cookieName } from '../contexts'
+const cookieName = 'privateKey'
 
-export function useInitializeCookie (cookies) {
-  const [cookieInitialized, setCookieInitialized] = useState(false)
+function walletCookieReducer (state, action) {
+  switch (action.type) {
+    case 'EXISTING_WALLET_COOKIE':
+      return { initialized: true, privateKey: action.payload }
+    case 'NEW_WALLET_COOKIE':
+      return { initialized: true, privateKey: action.payload }
+    case 'RESET_WALLET_COOKIE':
+      return { initialized: true, privateKey: action.payload }
+    default:
+      throw Error('No default case.')
+  }
+}
 
-  function initializeCookie () {
+const initialWalletCookieState = { initialized: false, privateKey: null }
+
+export function useWalletCookie (cookies) {
+  const [walletCookie, dispatch] = useReducer(walletCookieReducer, initialWalletCookieState)
+
+  function initializeWalletCookie () {
     const wallet = ethers.Wallet.createRandom()
-    cookies.set(cookieName, wallet.privateKey, { secure: true, sameSite: 'strict' })
+    cookies.set(cookieName, wallet.privateKey, { secure: true })
+    return wallet.privateKey
   }
 
   useEffect(() => {
-    if (cookies.get(cookieName)) {
-      setCookieInitialized(true)
+    const existingPrivateKey = cookies.get(cookieName)
+    if (existingPrivateKey) {
+      dispatch({ type: 'EXISTING_WALLET_COOKIE', payload: existingPrivateKey })
     } else {
-      initializeCookie()
-      setCookieInitialized(true)
+      const newPrivateKey = initializeWalletCookie()
+      dispatch({ type: 'NEW_WALLET_COOKIE', payload: newPrivateKey })
     }
   }, [])
 
   function resetCookie () {
-    cookies.remove(cookieName)
-    initializeCookie()
+    const newPrivateKey = initializeWalletCookie()
+    dispatch({ type: 'RESET_WALLET_COOKIE', payload: newPrivateKey })
   }
 
-  return [cookieInitialized, cookies.get(cookieName), resetCookie]
+  return [walletCookie.privateKey, resetCookie]
 }

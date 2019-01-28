@@ -1,11 +1,8 @@
-import React, { useContext } from 'react'
+import React from 'react'
 import Button from '@material-ui/core/Button'
 
-import { CookieContext } from '../contexts'
-
-export default function ResetCookie () {
-  const context = useContext(CookieContext)
+export default function ResetCookie ({ resetWalletCookie }) {
   return (
-    <Button onClick={context.resetCookie}>Reset Demo</Button>
+    <Button onClick={resetWalletCookie}>Reset Demo</Button>
   )
 }

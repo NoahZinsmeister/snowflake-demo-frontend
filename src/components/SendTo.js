@@ -5,9 +5,9 @@ import { useWeb3Context, useNetworkEffect } from 'web3-react/hooks'
 import { toDecimal, fromDecimal } from 'web3-react/utilities'
 import { ethers } from 'ethers'
 
-import { useWallet, useContract } from '../hooks/general'
+import { useContract } from '../hooks/general'
 
-export default function SendTo ({ ein }) {
+export default function SendTo ({ wallet, ein }) {
   const [recipientEIN, setRecipientEIN] = useState({value: '', error: null})
   const [maxEIN, setMaxEIN] = useState()
   const [recipientAmount, setRecipientAmount] = useState({value: '', error: null})
@@ -17,7 +17,6 @@ export default function SendTo ({ ein }) {
 
   const context = useWeb3Context()
 
-  const wallet = useWallet()
   const snowMoResolver = useContract("SnowMoResolver")
   const _1484 = useContract("1484")
   const snowflake = useContract("Snowflake")

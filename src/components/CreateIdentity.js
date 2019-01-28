@@ -1,16 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
-import Button from '@material-ui/core/Button'
 import { ethers } from 'ethers'
-import { useWeb3Context } from 'web3-react/hooks'
 
-import { useWallet, useContract, useContractAddress } from '../hooks/general'
+import { useContract, useContractAddress } from '../hooks/general'
 
 // TODO add currency preference to the create identity
-export default function CreateIdentity ({ reFetchEIN }) {
-  const context = useWeb3Context()
-  const [transactionHash, setTransactionHash] = useState()
+export default function CreateIdentity ({ wallet, setDemoBegun, setTransactionHash, children: Button, classes }) {
   const _1484Address = useContractAddress("1484")
-  const wallet = useWallet()
   const snowflakeAddress = useContractAddress("Snowflake")
   const demoHelper = useContract("DemoHelper")
   const timestamp = useRef(Math.round(new Date() / 1000) - 120)
@@ -31,6 +26,7 @@ export default function CreateIdentity ({ reFetchEIN }) {
   }, [])
 
   function sendTransaction () {
+    setDemoBegun(true)
     const to = demoHelper.address
     const transactionData = demoHelper.interface.functions.createIdentityDelegated.encode([
       wallet.address, "0x0000000000000000000000000000000000000000",
@@ -43,17 +39,5 @@ export default function CreateIdentity ({ reFetchEIN }) {
       .catch(error => console.error(error))
   }
 
-  useEffect(() => {
-    if (transactionHash) {
-      context.library.on(transactionHash, () => reFetchEIN())
-      return () => context.library.removeAllListeners(transactionHash)
-    }
-  }, [transactionHash])
-
-  return (
-    <>
-      <Button disabled={!(!!signature)} onClick={sendTransaction}>Create Identity</Button>
-      {transactionHash && <p>{transactionHash}</p>}
-    </>
-  )
+  return <Button disabled={!(!!signature)} onClick={sendTransaction} />
 }

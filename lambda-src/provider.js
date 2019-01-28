@@ -1,9 +1,9 @@
-import { ethers } from 'ethers'
+import { providers, Wallet } from 'ethers'
 
 export async function handler (event, context) {
   try {
-    const provider = new ethers.providers.JsonRpcProvider(process.env.REACT_APP_INFURA_URL)
-    const wallet = new ethers.Wallet(process.env.REACT_APP_PRIVATE_KEY, provider)
+    const provider = new providers.JsonRpcProvider(process.env.REACT_APP_INFURA_URL)
+    const wallet = new Wallet(process.env.REACT_APP_PRIVATE_KEY, provider)
 
     const { to, transactionData } = JSON.parse(event.body)
 

@@ -1,12 +1,38 @@
-import React, { useReducer, useEffect, useRef, useContext } from 'react'
+import React, { useReducer, useEffect, useRef } from 'react'
 import Typography from '@material-ui/core/Typography'
+import { makeStyles } from '@material-ui/styles';
 import { useWeb3Context } from 'web3-react/hooks'
 
-import { CookieContext } from '../contexts'
-import { useContract, useWallet } from '../hooks/general'
+import { useContract } from '../hooks/general'
 import ResetCookie from '../components/ResetCookie'
 import SendTo from '../components/SendTo'
 import Logs from '../components/Logs'
+
+const useStyles = makeStyles(theme => ({
+  root: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    width: '100%',
+    minHeight: '100%'
+  },
+  wrapper: {
+    margin: '2em',
+    padding: '2em',
+    borderRadius: '2em',
+    backgroundColor: theme.palette.grey[200],
+    width: '80%'
+  },
+  noDecoration: {
+    color: 'inherit'
+  },
+  flex: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '1em'
+  }
+}))
 
 const filterArguments1 = ein => [[ein]]
 const filterArguments2 = ein => [[ein, null], [null, ein]]
@@ -34,12 +60,11 @@ function logsReducer (state, action) {
   }
 }
 
-export default function Home ({ ein }) {
+export default function Home ({ wallet, resetWalletCookie, ein }) {
+  const classes = useStyles()
   const context = useWeb3Context()
-  const cookieContext = useContext(CookieContext)
   const [logs, dispatchLogs] = useReducer(logsReducer, {})
 
-  const wallet = useWallet()
   const snowMoResolver = useContract("SnowMoResolver")
 
   function initializeFilters (logName) {
@@ -50,8 +75,11 @@ export default function Home ({ ein }) {
     })
   }
 
-  function decodeLog (log) {
+  async function augmentLog (log) {
+    const timestamp = await context.library.getBlock(log.blockNumber)
+      .then(({ timestamp }) => timestamp)
     log.decoded = snowMoResolver.interface.parseLog(log).values
+    log.timestamp = timestamp
     return log
   }
 
@@ -67,9 +95,10 @@ export default function Home ({ ein }) {
   // add .on listeners to SnowMo contract for all filters
   useEffect(() => {
     Object.values(filters.current).flat().forEach(filter => {
-      snowMoResolver.on(filter, (...args) => {
-        const event = args[args.length - 1]
-        dispatchLogs({ type: 'APPEND', payload: { logName: event.event, log: decodeLog(event) } })
+      snowMoResolver.on(filter, async (...args) => {
+        const log = args[args.length - 1]
+        const augmentedLog = await augmentLog(log)
+        dispatchLogs({ type: 'APPEND', payload: { logName: log.event, log: augmentedLog } })
       })
     })
 
@@ -80,24 +109,27 @@ export default function Home ({ ein }) {
   useEffect(() => {
     Object.keys(filters.current).forEach(logName => {
       Promise.all(filters.current[logName].map(filter => context.library.getLogs(filter)))
-        .then(logs => dispatchLogs({
-          type: 'INITIALIZE', payload: { logName, logs: logs.flat().map(log => decodeLog(log)) }
-        }))
+        .then(async (logs) => {
+          const augmentedLogs = await Promise.all(logs.flat().map(log => augmentLog(log)))
+          dispatchLogs({ type: 'INITIALIZE', payload: { logName, logs: augmentedLogs } })
+        })
     })
   }, [])
 
   // on the (very) off chance the wallet has an EIN but no SnowMoSignup event, clear their wallet
   useEffect(() => {
     if (logs.SnowMoSignup && logs.SnowMoSignup.length === 0)
-      cookieContext.resetCookie()
+      resetWalletCookie()
   }, [logs.SnowMoSignup])
 
   return (
-    <>
+    <div className={classes.root}>
+      <div className={classes.wrapper}>
       <Typography>Your EIN: {ein}</Typography>
-      <SendTo ein={ein} />
+      <SendTo wallet={wallet} ein={ein} />
       <Logs logs={logs} logNames={Object.keys(logFilterArguments)} />
-      <ResetCookie />
-    </>
+      <ResetCookie resetWalletCookie={resetWalletCookie} />
+      </div>
+    </div>
   )
 }
