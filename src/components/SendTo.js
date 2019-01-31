@@ -1,53 +1,51 @@
 import React, { useState, useEffect } from 'react'
 import Button from '@material-ui/core/Button'
 import TextField from '@material-ui/core/TextField'
-import { useWeb3Context, useNetworkEffect } from 'web3-react/hooks'
-import { toDecimal, fromDecimal } from 'web3-react/utilities'
+import Snackbar from '@material-ui/core/Snackbar';
+import Typography from '@material-ui/core/Typography';
+import { makeStyles } from '@material-ui/styles';
+import { useWeb3Context } from 'web3-react/hooks'
+import { fromDecimal } from 'web3-react/utilities'
 import { ethers } from 'ethers'
+import { getEtherscanLink } from 'web3-react/utilities'
 
 import { useContract } from '../hooks/general'
 
-export default function SendTo ({ wallet, ein }) {
+const useStyles = makeStyles({
+  inputWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap'
+  },
+  input: {
+    flex: '1 1 auto',
+    margin: '1em !important',
+  },
+  button: {
+    flex: '0 1 auto',
+    margin: '1em !important',
+  }
+})
+
+export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
+  const classes = useStyles()
   const [recipientEIN, setRecipientEIN] = useState({value: '', error: null})
-  const [maxEIN, setMaxEIN] = useState()
   const [recipientAmount, setRecipientAmount] = useState({value: '', error: null})
-  const [snowflakeBalance, setSnowflakeBalance] = useState()
+
+  const canSend = (
+    recipientEIN.error === null && recipientAmount.error === null &&
+    recipientEIN.value !== '' && recipientAmount.value !== '' &&
+    Number(recipientEIN.value) !== ein
+  )
 
   const [transactionHash, setTransactionHash] = useState()
 
   const context = useWeb3Context()
 
   const snowMoResolver = useContract("SnowMoResolver")
-  const _1484 = useContract("1484")
   const snowflake = useContract("Snowflake")
-
-  function updateMaxEIN () {
-    _1484.functions.nextEIN()
-      .then(latestMaxEIN => {
-        if (latestMaxEIN.toNumber() !== maxEIN)
-          setMaxEIN(latestMaxEIN.toNumber())
-      })
-  }
-
-  // TODO move this up into the Home component and pass it down as a prop
-  function updateSnowflakeBalance () {
-    snowflake.functions.deposits(ein)
-      .then(latestSnowflakeBalance => {
-        if (Number(toDecimal(latestSnowflakeBalance.toString(10), 18)) !== snowflakeBalance)
-          setSnowflakeBalance(Number(toDecimal(latestSnowflakeBalance.toString(10), 18)))
-      })
-  }
-
-  // update the maxEIN and snowflakeBalance immediately, and once every block
-  useNetworkEffect(() => {
-    updateMaxEIN()
-    updateSnowflakeBalance()
-    context.library.on('block', updateMaxEIN)
-    context.library.on('block', updateSnowflakeBalance)
-    return () => {
-      context.library.removeAllListeners('block')
-    }
-  })
 
   // ensure that when the maxEIN updates, the recipientEIN is re-validated
   useEffect(() => {
@@ -61,10 +59,12 @@ export default function SendTo ({ wallet, ein }) {
 
   useEffect(() => {
     if (transactionHash) {
-      context.library.on(transactionHash, () => {
+      context.library.once(transactionHash, () => {
         setRecipientEIN({ value: '', error: null })
         setRecipientAmount({ value: '', error: null })
         context.forceAccountReRender()
+        setTransactionState('unsent')
+        setTransactionHash(null)
       })
       return () => context.library.removeAllListeners(transactionHash)
     }
@@ -85,7 +85,10 @@ export default function SendTo ({ wallet, ein }) {
       .then(signature => ethers.utils.splitSignature(signature))
   }
 
+  const [transactionState, setTransactionState] = useState('unsent')
+
   async function sendTransaction () {
+    setTransactionState('waiting')
     // encode snowMoResolver.functions.sendTo(ein, recipientEIN.value, recipientAmount.value)
     const functionSelector = ethers.utils.hexDataSlice(ethers.utils.id('sendTo(uint256,uint256,uint256)'), 0, 4)
     const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
@@ -103,8 +106,13 @@ export default function SendTo ({ wallet, ein }) {
 
     fetch('/.netlify/functions/provider', { method: 'POST', body: JSON.stringify({ to, transactionData }) })
       .then(response => response.json())
-      .then(json => setTransactionHash(json.transactionHash))
-      .catch(error => console.error(error))
+      .then(json => {
+        setTransactionHash(json.transactionHash)
+      })
+      .catch(error => {
+        setTransactionState('error')
+        console.error(error)
+      })
   }
 
   function validateCurrentRecipientEIN () {
@@ -126,32 +134,67 @@ export default function SendTo ({ wallet, ein }) {
 
   function updateRecipientAmount (event) {
     if (event.target.value === '' || /^[1-9]+[0-9]*$/.test(event.target.value)) {
-      const errorMessage = (!maxEIN || Number(event.target.value) < snowflakeBalance) ?
+      const errorMessage = (!maxEIN || Number(event.target.value) <= snowflakeBalance) ?
         null : 'Cannot send more than your current balance.'
       setRecipientAmount({ value: event.target.value, error: errorMessage })
     }
   }
 
   return (
-    <form>
-      <TextField
-        label="Recipient EIN"
-        helperText={recipientEIN.error ? recipientEIN.error : "The EIN you wish to send funds to."}
-        error={!!recipientEIN.error}
-        value={recipientEIN.value}
-        onChange={updateRecipientEIN}
-        fullWidth
-      />
-      <TextField
-        label="Amount"
-        helperText={recipientAmount.error ? recipientAmount.error : "The number of HYDRO tokens you wish to send."}
-        error={!!recipientAmount.error}
-        value={recipientAmount.value}
-        onChange={updateRecipientAmount}
-        fullWidth
-      />
-      <Button onClick={sendTransaction}>Send</Button>
-      {transactionHash && <p>{transactionHash}</p>}
-    </form>
+    <>
+      <Typography variant='h5' align='center' >
+        Send HYDRO
+      </Typography>
+
+      <form>
+        <div className={classes.inputWrapper}>
+          <TextField
+            disabled={transactionState === 'waiting'}
+            className={classes.input}
+            label="To"
+            helperText={recipientEIN.error ? recipientEIN.error : "The EIN you want to send tokens to."}
+            error={!!recipientEIN.error}
+            value={recipientEIN.value}
+            onChange={updateRecipientEIN}
+          />
+          <TextField
+            disabled={transactionState === 'waiting'}
+            className={classes.input}
+            label="Amount"
+            helperText={recipientAmount.error ? recipientAmount.error : "The number of tokens you want to send."}
+            error={!!recipientAmount.error}
+            value={recipientAmount.value}
+            onChange={updateRecipientAmount}
+          />
+          <div className={classes.button}>
+            <Button
+              disabled={!canSend || transactionState === 'waiting'} variant='contained' color='secondary' onClick={sendTransaction}
+            >
+              {transactionState === 'unsent' && 'Send'}
+              {transactionState === 'waiting' && 'Waiting on Confirmation...'}
+              {transactionState === 'error' && 'Error'}
+            </Button>
+          </div>
+        </div>
+      </form>
+      <div>
+        <Snackbar
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          open={!!transactionHash}
+          message={<span>Waiting on Transaction...</span>}
+          action={[
+            <Button
+              component='a' target='_blank' href={getEtherscanLink(context.networkId, 'transaction', transactionHash)}
+              key="etherscan" size="small" color='secondary'
+            >
+              Link
+            </Button>
+          ]}
+        />
+      </div>
+    </>
   )
 }

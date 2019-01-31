@@ -1,14 +1,11 @@
-html {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
+html, body {
+  min-height: 100vh;
+  padding: 0em;
+  margin: 0em;
 }
 
 #root {
-  height: 100%;
   display: flex;
+  padding: 1em;
+  min-height: calc(100vh - 2em);
 }

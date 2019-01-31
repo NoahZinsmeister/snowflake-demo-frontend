@@ -1,28 +1,28 @@
-import React, { useReducer, useEffect, useRef } from 'react'
-import Typography from '@material-ui/core/Typography'
+import React, { useState, useReducer, useEffect, useRef } from 'react'
 import { makeStyles } from '@material-ui/styles';
 import { useWeb3Context } from 'web3-react/hooks'
+import { toDecimal } from 'web3-react/utilities'
+import { useNetworkEffect } from 'web3-react/hooks'
 
 import { useContract } from '../hooks/general'
-import ResetCookie from '../components/ResetCookie'
+import Header from '../components/Header'
 import SendTo from '../components/SendTo'
 import Logs from '../components/Logs'
 
 const useStyles = makeStyles(theme => ({
-  root: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    width: '100%',
-    minHeight: '100%'
-  },
   wrapper: {
-    margin: '2em',
+    margin: 'auto',
     padding: '2em',
     borderRadius: '2em',
+    height: 'fit-content',
     backgroundColor: theme.palette.grey[200],
-    width: '80%'
+    [theme.breakpoints.down('sm')]: {
+      width: '100%',
+      height: 'fit-content',
+    },
+    [theme.breakpoints.up('md')]: {
+      width: '50%',
+    }
   },
   noDecoration: {
     color: 'inherit'
@@ -60,9 +60,11 @@ function logsReducer (state, action) {
   }
 }
 
-export default function Home ({ wallet, resetWalletCookie, ein }) {
+export default function Home ({ wallet, removePrivateKey, ein }) {
   const classes = useStyles()
   const context = useWeb3Context()
+  const _1484 = useContract("1484")
+  const snowflake = useContract("Snowflake")
   const [logs, dispatchLogs] = useReducer(logsReducer, {})
 
   const snowMoResolver = useContract("SnowMoResolver")
@@ -119,17 +121,50 @@ export default function Home ({ wallet, resetWalletCookie, ein }) {
   // on the (very) off chance the wallet has an EIN but no SnowMoSignup event, clear their wallet
   useEffect(() => {
     if (logs.SnowMoSignup && logs.SnowMoSignup.length === 0)
-      resetWalletCookie()
+      removePrivateKey()
   }, [logs.SnowMoSignup])
 
+  // keep track of stuff that can change every block
+  const [maxEIN, setMaxEIN] = useState()
+  const [snowflakeBalance, setSnowflakeBalance] = useState()
+
+  function updateMaxEIN () {
+    _1484.functions.nextEIN()
+      .then(latestMaxEIN => {
+        if (latestMaxEIN.toNumber() !== maxEIN)
+          setMaxEIN(latestMaxEIN.toNumber())
+      })
+  }
+
+  function updateSnowflakeBalance () {
+    snowflake.functions.deposits(ein)
+      .then(latestSnowflakeBalance => {
+        const newSnowflakeBalance = Number(toDecimal(latestSnowflakeBalance.toString(10), 18))
+        if (newSnowflakeBalance !== snowflakeBalance)
+          setSnowflakeBalance(newSnowflakeBalance)
+      })
+  }
+
+  useNetworkEffect(() => {
+    updateMaxEIN()
+    updateSnowflakeBalance()
+    context.library.on('block', updateMaxEIN)
+    context.library.on('block', updateSnowflakeBalance)
+    return () => context.library.removeAllListeners('block')
+  })
+
+  // TODO actually add dai balance
+  const daiBalance = 0
+
   return (
-    <div className={classes.root}>
-      <div className={classes.wrapper}>
-      <Typography>Your EIN: {ein}</Typography>
-      <SendTo wallet={wallet} ein={ein} />
+    <div className={classes.wrapper}>
+      <Header
+        log={logs.SnowMoSignup} wallet={wallet} ein={ein}
+        snowflakeBalance={snowflakeBalance} daiBalance={daiBalance}
+        removePrivateKey={removePrivateKey}
+      />
+      <SendTo wallet={wallet} ein={ein} maxEIN={maxEIN} snowflakeBalance={snowflakeBalance} />
       <Logs logs={logs} logNames={Object.keys(logFilterArguments)} />
-      <ResetCookie resetWalletCookie={resetWalletCookie} />
-      </div>
     </div>
   )
 }
