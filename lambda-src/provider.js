@@ -1,12 +1,11 @@
 import { providers, Wallet } from 'ethers'
 
+const provider = new providers.JsonRpcProvider(process.env.REACT_APP_INFURA_URL)
+const wallet = new Wallet(process.env.REACT_APP_PRIVATE_KEY, provider)
+
 export async function handler (event, context) {
   try {
-    const provider = new providers.JsonRpcProvider(process.env.REACT_APP_INFURA_URL)
-    const wallet = new Wallet(process.env.REACT_APP_PRIVATE_KEY, provider)
-
     const { to, transactionData } = JSON.parse(event.body)
-
     const transaction = await wallet.sendTransaction({ to, data: transactionData })
 
     return {
