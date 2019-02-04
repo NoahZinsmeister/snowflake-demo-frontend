@@ -4,7 +4,7 @@ import { ethers } from 'ethers'
 import { useContract, useContractAddress } from '../hooks/general'
 
 // TODO add currency preference to the create identity
-export default function CreateIdentity ({ wallet, onClick, setTransactionHash, children }) {
+export default function CreateIdentity ({ wallet, onClick, setTransactionHash, setError, children }) {
   const _1484Address = useContractAddress("1484")
   const snowflakeAddress = useContractAddress("Snowflake")
   const demoHelper = useContract("DemoHelper")
@@ -38,12 +38,13 @@ export default function CreateIdentity ({ wallet, onClick, setTransactionHash, c
     ])
 
     // console.log(to, transactionData)
+    // setError(Error('uh-oh'))
     // setTransactionHash('0xff130ca9228c8f161e533ce31e4bbddcf3de77fe0a0210ae8484e37cac1bf4e5')
 
     fetch('/.netlify/functions/provider', { method: 'POST', body: JSON.stringify({ to, transactionData }) })
       .then(response => response.json())
       .then(json => setTransactionHash(json.transactionHash))
-      .catch(error => console.error(error))
+      .catch(error => setError(error))
   }
 
   return children(sendTransaction)

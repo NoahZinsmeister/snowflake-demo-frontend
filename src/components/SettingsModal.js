@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import DialogTitle from '@material-ui/core/DialogTitle';
 import Dialog from '@material-ui/core/Dialog';
 import Button from '@material-ui/core/Button';
+import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
 import { getEtherscanLink } from 'web3-react/utilities'
 import { useWeb3Context } from 'web3-react/hooks'
@@ -19,10 +20,11 @@ const useStyles = makeStyles({
   }
 })
 
-export default function SettingsModal ({ log, open, onClose, removePrivateKey }) {
+export default function SettingsModal ({ wallet, log, open, onClose, removePrivateKey }) {
   const classes = useStyles()
 
   const context = useWeb3Context()
+  const [showPrivateKey, setShowPrivateKey] = useState(false)
 
   const transactionHash = log && log[0] && log[0].transactionHash
 
@@ -30,13 +32,25 @@ export default function SettingsModal ({ log, open, onClose, removePrivateKey })
     <Dialog open={open} onClose={onClose} fullWidth maxWidth='md'>
       <DialogTitle align='center'>Settings</DialogTitle>
       <div className={classes.centered}>
+        <Button color='secondary' variant='contained' onClick={() => setShowPrivateKey(v => !v)}>
+          Show Private Key
+        </Button>
+        <div className={classes.spacer}>
+          {showPrivateKey && (
+            <Typography variant='body1' align='center' paragraph={true}>
+              {wallet.privateKey}
+            </Typography>
+          )}
+        </div>
         <Button
           component='a' href={getEtherscanLink(context.networkId, 'transaction', transactionHash)} target='_blank'
           color='secondary' variant='contained'
         >
           View Creation Transaction
         </Button>
+
         <div className={classes.spacer} />
+
         <Button color='secondary' variant='contained' onClick={removePrivateKey}>Reset Demo</Button>
       </div>
     </Dialog>

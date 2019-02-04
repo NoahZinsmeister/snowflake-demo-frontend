@@ -75,8 +75,17 @@ export default function SelectIdentity ({ stepCompleted, proceed, setPrivateKey,
 
   const [transactionState, setTransactionState] = useState('unsent')
 
+  function setError(error) {
+    console.error(error)
+    setTransactionState('error')
+  }
+
   function apiCallMade () {
     setTransactionState('waiting')
+  }
+
+  function resetTransactionState () {
+    setTransactionState('unsent')
   }
 
   function finalizeIdentity (transactionHash) {
@@ -128,14 +137,17 @@ export default function SelectIdentity ({ stepCompleted, proceed, setPrivateKey,
           wallet={currentWalletCandidate}
           onClick={apiCallMade}
           setTransactionHash={finalizeIdentity}
+          setError={setError}
         >
           {sendTransaction => (
             <Button
               disabled={!(!!currentWalletCandidate.address) || transactionState === 'waiting'}
               variant='contained' color='secondary'
-              onClick={sendTransaction}
+              onClick={transactionState === 'unsent' ? sendTransaction : resetTransactionState}
             >
-              {transactionState === 'waiting' ? 'Confirming Your Choice...' : 'Finalize Your Choice'}
+              {transactionState === 'unsent' && 'Finalize Your Choice'}
+              {transactionState === 'waiting' && 'Confirming Your Choice...'}
+              {transactionState === 'error' && 'Error. Try again?'}
             </Button>
           )
           }

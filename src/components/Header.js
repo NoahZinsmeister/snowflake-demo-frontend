@@ -44,7 +44,9 @@ export default function Header ({ wallet, ein, snowflakeBalance, daiBalance, log
       </div>
 
       <SettingsModal
-        log={log} removePrivateKey={removePrivateKey} open={settingsModalOpen} onClose={() => setSettingsModalOpen(false)}
+        wallet={wallet}
+        log={log}
+        removePrivateKey={removePrivateKey} open={settingsModalOpen} onClose={() => setSettingsModalOpen(false)}
       />
 
       <div className={classes.centered}>

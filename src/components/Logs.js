@@ -29,9 +29,7 @@ const useStyles = makeStyles({
     overflowX: 'auto'
   },
   table: {
-    maxWidth: '0em',
-    display: 'flow-root !important',
-    backgroundColor: 'transparent !important'
+    tableLayout: 'fixed'
   }
 })
 

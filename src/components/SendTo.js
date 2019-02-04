@@ -70,6 +70,10 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
     }
   }, [transactionHash])
 
+  function resetTransactionState () {
+    setTransactionState('unsent')
+  }
+
   async function getSignedPermission (transactionBytes) {
     const nonce = await snowflake.functions.signatureNonce(ein)
 
@@ -110,8 +114,8 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
         setTransactionHash(json.transactionHash)
       })
       .catch(error => {
-        setTransactionState('error')
         console.error(error)
+        setTransactionState('error')
       })
   }
 
@@ -168,11 +172,12 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
           />
           <div className={classes.button}>
             <Button
-              disabled={!canSend || transactionState === 'waiting'} variant='contained' color='secondary' onClick={sendTransaction}
+              disabled={!canSend || transactionState === 'waiting'} variant='contained' color='secondary'
+              onClick={transactionState === 'unsent' ? sendTransaction : resetTransactionState}
             >
               {transactionState === 'unsent' && 'Send'}
               {transactionState === 'waiting' && 'Waiting on Confirmation...'}
-              {transactionState === 'error' && 'Error'}
+              {transactionState === 'error' && 'Error. Try Again?'}
             </Button>
           </div>
         </div>
