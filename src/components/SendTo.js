@@ -43,7 +43,8 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
   const [transactionHash, setTransactionHash] = useState()
 
   const context = useWeb3Context()
-
+  const _1484 = useContract("1484")
+  const DAI = useContract("DAI")
   const snowMoResolver = useContract("SnowMoResolver")
   const snowflake = useContract("Snowflake")
 
@@ -93,12 +94,42 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
 
   async function sendTransaction () {
     setTransactionState('waiting')
-    // encode snowMoResolver.functions.sendTo(ein, recipientEIN.value, recipientAmount.value)
-    const functionSelector = ethers.utils.hexDataSlice(ethers.utils.id('sendTo(uint256,uint256,uint256)'), 0, 4)
-    const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
-      ['uint256', 'uint256', 'uint256'], [ein, recipientEIN.value, fromDecimal(recipientAmount.value, 18)]
-    )
-    const transactionBytes = `${functionSelector}${abiEncodedArguments.substring(2)}`
+
+    async function getEncodedSendTo () {
+      // encode snowMoResolver.functions.sendTo
+      const functionSelector = ethers.utils.hexDataSlice(
+        ethers.utils.id('sendTo(uint256,uint256,uint256,string)'), 0, 4
+      )
+      const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'uint256', 'uint256', 'string'],
+        [ein, recipientEIN.value, fromDecimal(recipientAmount.value, 18), '']
+      )
+      const transactionBytes = `${functionSelector}${abiEncodedArguments.substring(2)}`
+
+      return transactionBytes
+    }
+
+    async function getEncodedForceWithdrawToVia () {
+      // encode snowMoResolver.functions.forceWithdrawToVia
+      const functionSelector = ethers.utils.hexDataSlice(
+        ethers.utils.id('forceWithdrawToVia(uint256,address,uint256,address,string)'), 0, 4
+      )
+
+      const recipientIdentity = await _1484.functions.getIdentity(recipientEIN.value)
+      const addressTo = recipientIdentity.associatedAddresses[0]
+
+      const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'address', 'uint256', 'address', 'string'],
+        [ein, addressTo, fromDecimal(recipientAmount.value, 18), DAI.address, '']
+      )
+      const transactionBytes = `${functionSelector}${abiEncodedArguments.substring(2)}`
+
+      return transactionBytes
+    }
+
+    const defaultIsHYDRO = (await snowMoResolver.functions.tokenPreferences(ein)) === ethers.constants.AddressZero
+
+    const transactionBytes = await (defaultIsHYDRO ? getEncodedSendTo() : getEncodedForceWithdrawToVia())
 
     const permission = await getSignedPermission(transactionBytes)
 
@@ -109,10 +140,12 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
     ])
 
     fetch('/.netlify/functions/provider', { method: 'POST', body: JSON.stringify({ to, transactionData }) })
-      .then(response => response.json())
-      .then(json => {
-        setTransactionHash(json.transactionHash)
+      .then(async response => {
+        const json = await response.json()
+        if (response.status !== 200) throw Error(json.message)
+        return json
       })
+      .then(json => setTransactionHash(json.transactionHash))
       .catch(error => {
         console.error(error)
         setTransactionState('error')
@@ -175,9 +208,9 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
               disabled={!canSend || transactionState === 'waiting'} variant='contained' color='secondary'
               onClick={transactionState === 'unsent' ? sendTransaction : resetTransactionState}
             >
+              {transactionState === 'error' && 'Error. Try Again?'}
               {transactionState === 'unsent' && 'Send'}
               {transactionState === 'waiting' && 'Waiting on Confirmation...'}
-              {transactionState === 'error' && 'Error. Try Again?'}
             </Button>
           </div>
         </div>

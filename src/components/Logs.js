@@ -11,7 +11,8 @@ import { makeStyles } from '@material-ui/styles';
 import { useWeb3Context } from 'web3-react/hooks'
 import { toDecimal, getEtherscanLink } from 'web3-react/utilities'
 import moment from 'moment'
-
+import { ReactComponent as DaiLogo } from '../assets/dai.svg'
+import { ReactComponent as HydroLogo } from '../assets/hydro.svg'
 
 const useStyles = makeStyles({
   title: {
@@ -30,6 +31,9 @@ const useStyles = makeStyles({
   },
   table: {
     tableLayout: 'fixed'
+  },
+  logo: {
+    height: '1em'
   }
 })
 
@@ -49,11 +53,22 @@ export default function Logs ({ logs, logNames }) {
       </Typography>
     )
 
-    const validLogs = logs.TransferFrom.filter(l => !l.removed)
+    const validTransferFromLogs = logs.TransferFrom.filter(l => !l.removed)
+    const validWithdrawFromViaLogs = logs.WithdrawFromVia.filter(l => !l.removed)
+    const validLogs = validTransferFromLogs.concat(validWithdrawFromViaLogs)
+    validLogs.sort((a, b) => {
+      if (a.blockNumber > b.blockNumber) return 1
+      if (a.blockNumber < b.blockNumber) return -1
+
+      if (a.transactionIndex > b.transactionIndex) return -1
+      if (a.transactionIndex < b.transactionIndex) return 1
+
+      return 0
+    })
 
     if (validLogs.length === 0) return (
       <Typography variant='body1' align='center' paragraph={true}>
-        No History Yet
+        No Transfer History
       </Typography>
     )
 
@@ -62,6 +77,10 @@ export default function Logs ({ logs, logNames }) {
         <Table className={classes.table}>
           <TableHead>
             <TableRow>
+              <TableCell align='right'>Type</TableCell>
+              <TableCell align='right'>Counterparty</TableCell>
+              <TableCell align='right'></TableCell>
+              <TableCell align='right'>Amount</TableCell>
               <TableCell className={classes.checkboxCell}>
                 Time
                 <Checkbox
@@ -69,9 +88,6 @@ export default function Logs ({ logs, logNames }) {
                   onChange={() => setAbsoluteDates(!absoluteDates)}
                 />
               </TableCell>
-              <TableCell align='right'>From</TableCell>
-              <TableCell align='right'>To</TableCell>
-              <TableCell align='right'>Amount</TableCell>
               <TableCell align='right'>Transaction Hash</TableCell>
             </TableRow>
           </TableHead>
@@ -81,12 +97,25 @@ export default function Logs ({ logs, logNames }) {
                 moment.unix(log.timestamp).fromNow() :
                 moment.unix(log.timestamp).calendar()
 
+              const daiAmount = log.daiAmount && Number(toDecimal(log.daiAmount.toString(10), 18))
+              const formattedDaiAmount = daiAmount && (daiAmount < .01 ? '<.01' : Math.round(daiAmount * 100) / 100)
+
               return (
                 <TableRow key={i}>
+                  <TableCell align='right'>{log.transferType}</TableCell>
+                  <TableCell align='right'>
+                    {log.transferType === 'Sent' ?
+                      ((log.decoded.einTo && log.decoded.einTo.toNumber()) || log.einTo.toNumber()) :
+                      log.decoded.einFrom.toNumber()
+                    }
+                  </TableCell>
+                  <TableCell align='right' padding='checkbox'>
+                    {formattedDaiAmount ? <DaiLogo className={classes.logo} /> : <HydroLogo className={classes.logo} />}
+                  </TableCell>
+                  <TableCell align='right'>
+                    {formattedDaiAmount ? formattedDaiAmount : toDecimal(log.decoded.amount.toString(10), 18)}
+                  </TableCell>
                   <TableCell>{absoluteDates ? moment.unix(log.timestamp).format('L LT') : relativeDate}</TableCell>
-                  <TableCell align='right'>{log.decoded.einFrom.toNumber()}</TableCell>
-                  <TableCell align='right'>{log.decoded.einTo.toNumber()}</TableCell>
-                  <TableCell align='right'>{toDecimal(log.decoded.amount.toString(10), 18)}</TableCell>
                   <TableCell align='right'>
                     <a
                       href={getEtherscanLink(context.networkId, 'transaction', log.transactionHash)}

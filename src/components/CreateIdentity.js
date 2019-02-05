@@ -42,7 +42,11 @@ export default function CreateIdentity ({ wallet, onClick, setTransactionHash, s
     // setTransactionHash('0xff130ca9228c8f161e533ce31e4bbddcf3de77fe0a0210ae8484e37cac1bf4e5')
 
     fetch('/.netlify/functions/provider', { method: 'POST', body: JSON.stringify({ to, transactionData }) })
-      .then(response => response.json())
+      .then(async response => {
+        const json = await response.json()
+        if (response.status !== 200) throw Error(json.message)
+        return json
+      })
       .then(json => setTransactionHash(json.transactionHash))
       .catch(error => setError(error))
   }

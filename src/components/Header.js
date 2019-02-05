@@ -30,7 +30,7 @@ const useStyles = makeStyles({
   }
 })
 
-export default function Header ({ wallet, ein, snowflakeBalance, daiBalance, log, removePrivateKey }) {
+export default function Header ({ wallet, ein, snowflakeBalance, daiBalance, currencyPreference, log, removePrivateKey }) {
   const classes = useStyles()
 
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
@@ -44,8 +44,10 @@ export default function Header ({ wallet, ein, snowflakeBalance, daiBalance, log
       </div>
 
       <SettingsModal
+        ein={ein}
         wallet={wallet}
         log={log}
+        currencyPreference={currencyPreference}
         removePrivateKey={removePrivateKey} open={settingsModalOpen} onClose={() => setSettingsModalOpen(false)}
       />
 
