@@ -1,5 +1,7 @@
 # Quickstart
 
+The smart contracts that power this demo can be found in [NoahHydro/snowflake-demo-smart-contracts](https://github.com/NoahHydro/snowflake-demo-smart-contracts).
+
 ## 1. Set up environment variables
 ```bash
 cp .env.local.example .env.local
