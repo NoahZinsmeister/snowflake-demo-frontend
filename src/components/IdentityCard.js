@@ -7,8 +7,8 @@ import Badge from '@material-ui/core/Badge';
 import Button from '@material-ui/core/Button';
 import Tooltip from '@material-ui/core/Tooltip';
 import { makeStyles } from '@material-ui/styles';
-import { ReactComponent as DaiLogo } from '../assets/dai.svg'
 import { ReactComponent as HydroLogo } from '../assets/hydro.svg'
+import { ReactComponent as DaiLogo } from '../assets/dai.svg'
 
 const useStyles = makeStyles(theme => ({
   header: {
@@ -80,67 +80,48 @@ const useStyles = makeStyles(theme => ({
   }
 }))
 
-export function Balances ({ snowflakeBalance, daiBalance }) {
+export function Balances ({ type = 'Hydro', balance, showBadge }) {
   const classes = useStyles()
+
+  const [badgeHovered, setBadgeHovered] = useState(false)
 
   return (
     <div className={classnames(classes.cardContent, classes.balancesCardContent)}>
       <Tooltip
-        title="HYDRO is the native token of Snowflake."
+        title={type === 'Hydro'
+          ? "HYDRO is the native token of Snowflake."
+          : 'DAI is a stablecoin pegged to the price of $1.'
+        }
         placement="top"
         enterTouchDelay={0}
         leaveTouchDelay={1250}
         classes={{tooltip: classes.hoverTooltip}}
       >
-        <Button disableRipple={true} classes={{ label: classes.balanceRowLabel }}>
-          <div className={classes.balanceRow}>
-            <div className={classes.logo}>
-              <HydroLogo />
+        <Badge invisible={badgeHovered || !showBadge} classes={{badge: classes.badge}} color="secondary" variant='standard'>
+          <Button onMouseEnter={() => setBadgeHovered(true)} disableRipple={true} classes={{ label: classes.balanceRowLabel }}>
+            <div className={classes.balanceRow}>
+              <div className={classes.logo}>
+                {type === 'Hydro' ? <HydroLogo /> : <DaiLogo />}
+              </div>
+              <div className={classes.ticker}>
+                <Typography variant="h6" align='center' color='textSecondary'>
+                {type === 'Hydro' ? 'HYDRO' : 'DAI'}
+                </Typography>
+              </div>
+              <div className={classes.balance}>
+                <Typography variant="h6" align='right'>
+                  {balance.toLocaleString()}
+                </Typography>
+              </div>
             </div>
-            <div className={classes.ticker}>
-              <Typography variant="h6" align='center' color='textSecondary'>
-                HYDRO
-              </Typography>
-            </div>
-            <div className={classes.balance}>
-              <Typography variant="h6" align='right'>
-                {snowflakeBalance && snowflakeBalance.toLocaleString()}
-              </Typography>
-            </div>
-          </div>
-        </Button>
-      </Tooltip>
-
-      <Tooltip
-        title="DAI is a stablecoin pegged to USD."
-        placement="top"
-        enterTouchDelay={0}
-        leaveTouchDelay={1250}
-        classes={{tooltip: classes.hoverTooltip}}
-      >
-        <Button disableRipple={true} classes={{ label: classes.balanceRowLabel }}>
-          <div className={classes.balanceRow}>
-            <div className={classes.logo}>
-              <DaiLogo />
-            </div>
-            <div className={classes.ticker}>
-              <Typography variant="h6" align='center' color='textSecondary'>
-                DAI
-              </Typography>
-            </div>
-            <div className={classes.balance}>
-              <Typography variant="h6" align='right'>
-                {daiBalance && daiBalance.toLocaleString()}
-              </Typography>
-            </div>
-          </div>
-        </Button>
+          </Button>
+        </Badge>
       </Tooltip>
     </div>
   )
 }
 
-export default function IdentityCard ({ wallet, ein, snowflakeBalance, daiBalance, showBadge }) {
+export default function IdentityCard ({ wallet, ein, snowflakeBalance, showHYDROBadge, showEINBadge }) {
   const classes = useStyles()
 
   const [badgeHovered, setBadgeHovered] = useState(false)
@@ -170,7 +151,7 @@ export default function IdentityCard ({ wallet, ein, snowflakeBalance, daiBalanc
             leaveTouchDelay={1250}
             classes={{tooltip: classes.hoverTooltip}}
           >
-            <Badge invisible={badgeHovered || !showBadge} classes={{badge: classes.badge}} color="secondary" variant='standard'>
+            <Badge invisible={badgeHovered || !showEINBadge} classes={{badge: classes.badge}} color="secondary" variant='standard'>
               <Button onMouseEnter={() => setBadgeHovered(true)} disableRipple={true}>
                 <Typography variant="h6" align='center'>
                   <span className={classes.textSecondary}>EIN</span> {ein}
@@ -186,7 +167,7 @@ export default function IdentityCard ({ wallet, ein, snowflakeBalance, daiBalanc
         <div className={classnames(classes.cardContent, )}>
           <div className={classes.identiconCardContent} ref={identiconRef} />
         </div>
-        <Balances snowflakeBalance={snowflakeBalance} daiBalance={daiBalance} />
+        <Balances balance={snowflakeBalance} showBadge={showHYDROBadge} />
       </div>
     </Card>
   )

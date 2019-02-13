@@ -1,5 +1,9 @@
 import React, { useState } from 'react'
+import ExpansionPanel from '@material-ui/core/ExpansionPanel';
+import ExpansionPanelSummary from '@material-ui/core/ExpansionPanelSummary';
+import ExpansionPanelDetails from '@material-ui/core/ExpansionPanelDetails';
 import Typography from '@material-ui/core/Typography';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
@@ -8,9 +12,11 @@ import TableRow from '@material-ui/core/TableRow';
 import DateIcon from '@material-ui/icons/DateRangeSharp';
 import Checkbox from '@material-ui/core/Checkbox';
 import { makeStyles } from '@material-ui/styles';
-import { useWeb3Context } from 'web3-react/hooks'
-import { toDecimal, getEtherscanLink } from 'web3-react/utilities'
+import { useWeb3Context } from 'web3-react'
+import { utils } from 'ethers'
 import moment from 'moment'
+
+import { getEtherscanLink } from '../utilities'
 import { ReactComponent as DaiLogo } from '../assets/dai.svg'
 import { ReactComponent as HydroLogo } from '../assets/hydro.svg'
 
@@ -34,6 +40,15 @@ const useStyles = makeStyles({
   },
   logo: {
     height: '1em'
+  },
+  panel: {
+    marginTop: '2em',
+    borderRadius: '5px',
+  },
+  noBefore: {
+    '&:before': {
+      height: '0 !important'
+    }
   }
 })
 
@@ -97,23 +112,25 @@ export default function Logs ({ logs, logNames }) {
                 moment.unix(log.timestamp).fromNow() :
                 moment.unix(log.timestamp).calendar()
 
-              const daiAmount = log.daiAmount && Number(toDecimal(log.daiAmount.toString(10), 18))
+              const daiAmount = log.daiAmount && Number(utils.formatUnits(log.daiAmount, 18))
               const formattedDaiAmount = daiAmount && (daiAmount < .01 ? '<.01' : Math.round(daiAmount * 100) / 100)
 
               return (
                 <TableRow key={i}>
                   <TableCell align='right'>{log.transferType}</TableCell>
                   <TableCell align='right'>
-                    {log.transferType === 'Sent' ?
+                    {log.identityTo ? log.identityTo : (
+                      log.transferType === 'Sent' ?
                       ((log.decoded.einTo && log.decoded.einTo.toNumber()) || log.einTo.toNumber()) :
                       log.decoded.einFrom.toNumber()
+                    )
                     }
                   </TableCell>
                   <TableCell align='right' padding='checkbox'>
                     {formattedDaiAmount ? <DaiLogo className={classes.logo} /> : <HydroLogo className={classes.logo} />}
                   </TableCell>
                   <TableCell align='right'>
-                    {formattedDaiAmount ? formattedDaiAmount : toDecimal(log.decoded.amount.toString(10), 18)}
+                    {formattedDaiAmount ? formattedDaiAmount : utils.formatUnits(log.decoded.amount, 18)}
                   </TableCell>
                   <TableCell>{absoluteDates ? moment.unix(log.timestamp).format('L LT') : relativeDate}</TableCell>
                   <TableCell align='right'>
@@ -138,10 +155,14 @@ export default function Logs ({ logs, logNames }) {
 
   return (
     <>
-      <Typography className={classes.title} variant='h6' align='center'>
-        Transfer History
-      </Typography>
-      {getLogDisplayData()}
+      <ExpansionPanel className={classes.panel} classes={{root: classes.noBefore}}>
+        <ExpansionPanelSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant='h6'>Transfer History</Typography>
+        </ExpansionPanelSummary>
+        <ExpansionPanelDetails>
+          {getLogDisplayData()}
+        </ExpansionPanelDetails>
+      </ExpansionPanel>
     </>
   )
 }

@@ -36,7 +36,10 @@ export default function Intro () {
       </Typography>
 
       <div className={classes.centered}>
-        <Fab component={Link} to={{ pathname: '/start', state: { activeStep: 0 } }} variant="extended" color='secondary' size='large'>
+        <Fab
+          component={Link} to={{ pathname: '/start', state: { activeStep: 0 } }}
+          variant="extended" color='secondary' size='large'
+        >
           Begin
         </Fab>
       </div>

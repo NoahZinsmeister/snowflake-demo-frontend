@@ -4,7 +4,7 @@ import Button from '@material-ui/core/Button';
 import Card from '@material-ui/core/Card';
 import { makeStyles } from '@material-ui/styles';
 
-import { Balances } from '../IdentityCard'
+import { Balances } from '../../components/IdentityCard'
 
 // TODO fix flickering ref setting
 const useStyles = makeStyles({
@@ -23,10 +23,10 @@ const useStyles = makeStyles({
 export default function Fund ({ stepCompleted, proceed }) {
   const classes = useStyles()
 
-  return stepCompleted ? (
+  return (Number.isInteger(stepCompleted) && stepCompleted >= 1) ? (
     <>
       <Typography variant='body2' paragraph={true} align='center'>
-        10,000 HYDRO claimed
+        10,000 HYDRO claimed!
       </Typography>
 
       <div className={classes.centered}>
@@ -38,17 +38,13 @@ export default function Fund ({ stepCompleted, proceed }) {
   ) : (
     <>
       <div className={classes.centered}>
-
-      </div>
-
-      <div className={classes.centered}>
         <Typography variant='body1' paragraph={true}>
-          Congratulations! As a welcome gift, we've deposited 10,000 HYDRO tokens into your account. Later on,{' '}
-          you'll be able to send these to your friends, or swap them for DAI!
+          As a welcome gift, we've deposited 10,000 HYDRO tokens into your account! Soon{' '}
+          you'll be able to send these to your friends, or use them to buy digital items denominated in other tokens.
         </Typography>
 
         <Card>
-          <Balances snowflakeBalance={10000} daiBalance={0} />
+          <Balances balance={10000} showBadge={true} />
         </Card>
 
         <div className={classes.proceed}>

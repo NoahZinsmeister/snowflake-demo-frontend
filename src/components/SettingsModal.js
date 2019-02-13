@@ -1,17 +1,14 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import DialogTitle from '@material-ui/core/DialogTitle';
 import Dialog from '@material-ui/core/Dialog';
 import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
-import FormGroup from '@material-ui/core/FormGroup';
-import FormControlLabel from '@material-ui/core/FormControlLabel';
-import Switch from '@material-ui/core/Switch';
-import { getEtherscanLink } from 'web3-react/utilities'
-import { ethers } from 'ethers'
-import { useWeb3Context } from 'web3-react/hooks'
+import { useWeb3Context } from 'web3-react'
+import { CopyToClipboard } from 'react-copy-to-clipboard'
 
-import { useContract } from '../hooks/general'
+import { getEtherscanLink } from '../utilities'
+
 
 const useStyles = makeStyles({
   centered: {
@@ -33,109 +30,43 @@ const useStyles = makeStyles({
   },
   HYDRO: {
     color: '#0971F5 !important'
+  },
+  width: {
+    width: '70%'
   }
 })
 
-export default function SettingsModal ({ ein, wallet, log, currencyPreference, open, onClose, removePrivateKey }) {
+export default function SettingsModal ({
+  wallet, creationTransactionHash, resetDemo, open, onClose
+}) {
   const classes = useStyles()
-
   const context = useWeb3Context()
-  const DAI = useContract("DAI")
-  const snowflake = useContract("Snowflake")
-  const snowMoResolver = useContract("SnowMoResolver")
-  const [showPrivateKey, setShowPrivateKey] = useState(false)
-  const [defaultCurrencyCurrent, setDefaultCurrencyCurrent] = useState(null)
-  const canChangeDefaultCurrency = defaultCurrencyCurrent !== currencyPreference
-
-  useEffect(() => {
-    resetTransactionState()
-    setDefaultCurrencyCurrent(currencyPreference)
-    }, [currencyPreference])
-
-  function toggleDefaultCurrencyCurrent () {
-    const toggle = defaultCurrencyCurrent === ethers.constants.AddressZero ? DAI.address : ethers.constants.AddressZero
-    setDefaultCurrencyCurrent(toggle)
-  }
-
-  const transactionHash = log && log[0] && log[0].transactionHash
-
-  const [transactionState, setTransactionState] = useState('unsent')
-
-  async function getSignedPermission (transactionBytes) {
-    const nonce = await snowflake.functions.signatureNonce(ein)
-
-    const allowAndCallMessage = ethers.utils.arrayify(ethers.utils.solidityKeccak256(
-      ['bytes1', 'bytes1', 'address', 'string', 'uint256', 'address', 'uint256', 'bytes', 'uint256'],
-      [
-        '0x19', '0x00', snowflake.address, 'I authorize this allow and call.',
-        ein, snowMoResolver.address, 0, transactionBytes, nonce.toString()
-      ]
-    ))
-
-    return wallet.signMessage(allowAndCallMessage)
-      .then(signature => ethers.utils.splitSignature(signature))
-  }
-
-  // const [transactionState, setTransactionState] = useState('unsent')
-
-  async function sendTransaction () {
-    setTransactionState('waiting')
-
-    // encode snowMoResolver.functions.changeTokenPreference
-    const functionSelector = ethers.utils.hexDataSlice(
-      ethers.utils.id('changeTokenPreference(uint256,address)'), 0, 4
-    )
-    const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
-      ['uint256', 'address'],
-      [ein, defaultCurrencyCurrent]
-    )
-    const transactionBytes = `${functionSelector}${abiEncodedArguments.substring(2)}`
-
-    const permission = await getSignedPermission(transactionBytes)
-
-    const to = snowflake.address
-    const transactionData = snowflake.interface.functions.allowAndCallDelegated.encode([
-      snowMoResolver.address, 0, transactionBytes, wallet.address,
-      permission.v, permission.r, permission.s
-    ])
-
-    // TODO make this more robust
-    fetch('/.netlify/functions/provider', { method: 'POST', body: JSON.stringify({ to, transactionData }) })
-      .then(async response => {
-        const json = await response.json()
-        if (response.status !== 200) throw Error(json.message)
-        return json
-      })
-      .then(json => console.log(json.transactionHash))
-      .catch(error => {
-        console.error(error)
-        setTransactionState('error')
-      })
-  }
-
-  function resetTransactionState () {
-    setTransactionState('unsent')
-  }
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth='md'>
-      <DialogTitle align='center'>Settings</DialogTitle>
       <div className={classes.centered}>
-        <div className={classes.spacer}>
-          <Button color='secondary' variant='contained' onClick={() => setShowPrivateKey(v => !v)}>
-            Show Private Key
-          </Button>
 
-          {showPrivateKey && (
-            <Typography variant='body1' align='center' paragraph={true}>
-              {wallet.privateKey}
-            </Typography>
-          )}
+        <DialogTitle align='center'>Summary</DialogTitle>
+
+        <div className={classes.width}>
+          <Typography variant='body1' align='left' paragraph={true}>
+            Thank you for taking part in this demo! If you're curious about the specifics of how it all works, you're in the right place. Your <a href='https://github.com/cyphercodes96/Hydro-Snowflake-Identicon-Generator' target='_blank' rel='noopener noreferrer'>Snowflake avatar</a> is derived from a public address, the private key to which was generated by the site and is saved in local storage (for an idea of why this might not be the best idea outside of a demo setting, see <a href='https://medium.com/mycrypto/the-unintended-consequences-of-product-design-d35fcdfe777d' target='_blank' rel='noopener noreferrer'>this talk by MyCrypto founder Taylor Monahan</a>). Drawbacks aside, this pattern makes it easy to use a meta-transaction to create a persistent, on-chain user identity while abstracting away gas costs. User identities are created using the <a href='https://erc1484.org/' target='_blank' rel='noopener noreferrer'>ERC1484 framework</a>, which is where your EIN, or Ethereum Identification Number, comes from. All ongoing transactions are funneled through a <a href='https://github.com/NoahHydro/snowflake-demo-smart-contracts' target='_blank' rel='noopener noreferrer'>Resolver built specifically for this demo</a>. The code for this front-end is <a href='https://github.com/NoahHydro/snowflake-demo-frontend' target='_blank' rel='noopener noreferrer'>available on Github</a>. If you'd like to give us feedback on this demo, you may <a href='https://docs.google.com/forms/d/1BSGd3whDXcYOIz8iNXlOlDLAwDglrttW970mPX4prCE' target='_blank' rel='noopener noreferrer'>do so here</a>.
+          </Typography>
+        </div>
+
+        <DialogTitle align='center'>Settings</DialogTitle>
+
+        <div className={classes.spacer}>
+          <CopyToClipboard text={wallet.privateKey}>
+            <Button color='secondary' variant='contained'>
+              Copy Private Key
+            </Button>
+          </CopyToClipboard>
         </div>
 
         <div className={classes.spacer}>
           <Button
-            component='a' href={getEtherscanLink(context.networkId, 'transaction', transactionHash)} target='_blank'
+            component='a' href={getEtherscanLink(context.networkId, 'transaction', creationTransactionHash)} target='_blank'
             color='secondary' variant='contained'
           >
             View Creation Transaction
@@ -143,44 +74,7 @@ export default function SettingsModal ({ ein, wallet, log, currencyPreference, o
         </div>
 
         <div className={classes.spacer}>
-          <FormGroup row>
-            <FormControlLabel
-              control={
-                <Switch
-                  disabled={defaultCurrencyCurrent === null || transactionState === 'waiting'}
-                  checked={defaultCurrencyCurrent === ethers.constants.AddressZero}
-                  onChange={toggleDefaultCurrencyCurrent}
-                  classes={{switchBase: classes.DAI, checked: classes.HYDRO}} color="default"
-                />
-              }
-              label={`Default Currency: ${currencyPreference === ethers.constants.AddressZero ? 'HYDRO' : 'DAI'}`}
-              labelPlacement="top"
-            />
-          </FormGroup>
-          {canChangeDefaultCurrency &&
-            <Button disabled={transactionState === 'waiting'} color='secondary' variant='contained'
-              onClick={transactionState === 'unsent' ? sendTransaction : resetTransactionState}
-            >
-              {transactionState === 'error' && 'Error. Try Again?'}
-              {transactionState === 'unsent' &&
-                `Change Default Currency to ${currencyPreference === ethers.constants.AddressZero ? 'DAI' : 'HYDRO'}?`
-              }
-              {transactionState === 'waiting' && 'Waiting on Confirmation...'}
-            </Button>
-          }
-      </div>
-
-      <div className={classes.spacer}>
-        <Button
-          component='a' href='https://github.com/NoahHydro/snowflake-demo-frontend' target='_blank'
-          color='secondary' variant='contained'
-        >
-          View Code on Github
-        </Button>
-      </div>
-
-        <div className={classes.spacer}>
-          <Button color='secondary' variant='contained' onClick={removePrivateKey}>Reset Demo</Button>
+          <Button color='secondary' variant='contained' onClick={resetDemo}>Reset Demo</Button>
         </div>
       </div>
     </Dialog>

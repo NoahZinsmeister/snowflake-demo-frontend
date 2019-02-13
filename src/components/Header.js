@@ -1,9 +1,6 @@
-import React, { useState } from 'react'
-import IconButton from '@material-ui/core/IconButton';
-import SettingsIcon from '@material-ui/icons/Settings';
+import React from 'react'
 import { makeStyles } from '@material-ui/styles';
 
-import SettingsModal from './SettingsModal'
 import IdentityCard from './IdentityCard'
 
 const useStyles = makeStyles({
@@ -30,30 +27,12 @@ const useStyles = makeStyles({
   }
 })
 
-export default function Header ({ wallet, ein, snowflakeBalance, daiBalance, currencyPreference, log, removePrivateKey }) {
+export default function Header ({ wallet, ein, snowflakeBalance }) {
   const classes = useStyles()
 
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false)
-
   return (
-    <>
-      <div className={classes.settingsWrapper}>
-        <IconButton className={classes.settingsIcon} onClick={() => setSettingsModalOpen(true)}>
-          <SettingsIcon />
-        </IconButton>
-      </div>
-
-      <SettingsModal
-        ein={ein}
-        wallet={wallet}
-        log={log}
-        currencyPreference={currencyPreference}
-        removePrivateKey={removePrivateKey} open={settingsModalOpen} onClose={() => setSettingsModalOpen(false)}
-      />
-
-      <div className={classes.centered}>
-        <IdentityCard wallet={wallet} ein={ein} snowflakeBalance={snowflakeBalance} daiBalance={daiBalance} />
-      </div>
-    </>
+    <div className={classes.centered}>
+      <IdentityCard wallet={wallet} ein={ein} snowflakeBalance={snowflakeBalance} />
+    </div>
   )
 }

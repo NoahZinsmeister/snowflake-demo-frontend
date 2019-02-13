@@ -5,8 +5,7 @@ import Button from '@material-ui/core/Button';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import { makeStyles } from '@material-ui/styles';
 
-import CreateIdentity from '../CreateIdentity'
-import { useWallet } from '../../hooks/localStorage'
+import CreateIdentity from './CreateIdentity'
 
 // TODO fix flickering ref setting
 const useStyles = makeStyles({
@@ -40,12 +39,10 @@ const useStyles = makeStyles({
 })
 
 // TODO add currency preference to the create identity
-export default function SelectIdentity ({ stepCompleted, proceed, setPrivateKey, setTransactionHash }) {
+export default function SelectIdentity ({ stepCompleted, wallet, proceed }) {
   const classes = useStyles()
 
-  const [currentWalletCandidate, setCurrentWalletCandidate] = useState({})
-
-  const wallet = useWallet(currentWalletCandidate.privateKey)
+  const [currentWalletCandidate, setCurrentWalletCandidate] = useState()
 
   function generateNewWallet () {
     setCurrentWalletCandidate(ethers.Wallet.createRandom())
@@ -54,47 +51,25 @@ export default function SelectIdentity ({ stepCompleted, proceed, setPrivateKey,
   const identiconRef = useRef()
 
   const identicon = useMemo(() => {
-    if (stepCompleted)
-      return window.hydroIdenticon.create({
-        seed: wallet.address,
-        size: 150
-      })
-    else if (currentWalletCandidate.address)
-      return window.hydroIdenticon.create({
-        seed: currentWalletCandidate.address,
-        size: 150
-      })
-  }, [currentWalletCandidate.address, stepCompleted])
+    if (!wallet && !currentWalletCandidate) return null
+
+    const seed = (Number.isInteger(stepCompleted) && stepCompleted >= 0) ? wallet.address : currentWalletCandidate.address
+    return window.hydroIdenticon.create({
+      seed,
+      size: 150
+    })
+  }, [stepCompleted, wallet, currentWalletCandidate])
 
   useEffect(() => {
-    if (identiconRef.current && (currentWalletCandidate.address || stepCompleted)) {
+    if (identicon) {
       identiconRef.current.innerHTML = ''
       identiconRef.current.appendChild(identicon)
     }
-  }, [currentWalletCandidate.address, stepCompleted])
+  }, [identicon])
 
-  const [transactionState, setTransactionState] = useState('unsent')
+  const [generationDisabled, setGenerationDisabled] = useState(false)
 
-  function setError(error) {
-    console.error(error)
-    setTransactionState('error')
-  }
-
-  function apiCallMade () {
-    setTransactionState('waiting')
-  }
-
-  function resetTransactionState () {
-    setTransactionState('unsent')
-  }
-
-  function finalizeIdentity (transactionHash) {
-    setPrivateKey(currentWalletCandidate.privateKey)
-    setTransactionHash(transactionHash)
-    proceed()
-  }
-
-  return stepCompleted ? (
+  return (Number.isInteger(stepCompleted) && stepCompleted >= 0) ? (
     <>
       <Typography variant='body2' align='center'>
         Your avatar:
@@ -124,8 +99,8 @@ export default function SelectIdentity ({ stepCompleted, proceed, setPrivateKey,
       <div className={classes.centered}>
         <Button
           variant='contained'
-          color={currentWalletCandidate.address ? 'default' : 'secondary'} onClick={generateNewWallet}
-          disabled={transactionState === 'waiting'}
+          color={currentWalletCandidate ? 'default' : 'secondary'} onClick={generateNewWallet}
+          disabled={generationDisabled}
         >
           Generate Avatar
           <RefreshIcon className={classes.rightIcon} />
@@ -135,22 +110,48 @@ export default function SelectIdentity ({ stepCompleted, proceed, setPrivateKey,
 
         <CreateIdentity
           wallet={currentWalletCandidate}
-          onClick={apiCallMade}
-          setTransactionHash={finalizeIdentity}
-          setError={setError}
+          onClick={() => setGenerationDisabled(true)}
+          onTransactionHash={transactionHash => proceed(currentWalletCandidate.privateKey, transactionHash)}
+          onReset={() => setGenerationDisabled(false)}
         >
-          {sendTransaction => (
-            <Button
-              disabled={!(!!currentWalletCandidate.address) || transactionState === 'waiting'}
-              variant='contained' color='secondary'
-              onClick={transactionState === 'unsent' ? sendTransaction : resetTransactionState}
-            >
-              {transactionState === 'unsent' && 'Finalize Your Choice'}
-              {transactionState === 'waiting' && 'Confirming Your Choice...'}
-              {transactionState === 'error' && 'Error. Try again?'}
-            </Button>
-          )
-          }
+          {(transactionState, transactionControllers) => {
+            switch (transactionState) {
+              case 'unsent': {
+                return (
+                  <Button
+                    disabled={!currentWalletCandidate}
+                    variant='contained' color='secondary'
+                    onClick={transactionControllers.sendTransaction}
+                  >
+                    Finalize Your Choice
+                  </Button>
+                )
+              }
+              case 'waitingOnTransactionHash':
+              case 'waitingOnConfirmation': {
+                return (
+                  <Button
+                    disabled={true}
+                    variant='contained' color='secondary'
+                  >
+                    Confirming Your Choice...
+                  </Button>
+                )
+              }
+              case 'error': {
+                return (
+                  <Button
+                    variant='contained' color='secondary'
+                    onClick={transactionControllers.resetTransaction}
+                  >
+                    Error. Try again?
+                  </Button>
+                )
+              }
+              default:
+                return null
+            }
+          }}
         </CreateIdentity>
       </div>
     </>

@@ -4,12 +4,12 @@ import TextField from '@material-ui/core/TextField'
 import Snackbar from '@material-ui/core/Snackbar';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
-import { useWeb3Context } from 'web3-react/hooks'
-import { fromDecimal } from 'web3-react/utilities'
+import { useWeb3Context } from 'web3-react'
 import { ethers } from 'ethers'
-import { getEtherscanLink } from 'web3-react/utilities'
 
-import { useContract } from '../hooks/general'
+import TransactionController from './TransactionController'
+import { getEtherscanLink } from '../utilities'
+import { useContract } from '../hooks'
 
 const useStyles = makeStyles({
   inputWrapper: {
@@ -26,6 +26,9 @@ const useStyles = makeStyles({
   button: {
     flex: '0 1 auto',
     margin: '1em !important',
+  },
+  title: {
+    marginTop: '2em'
   }
 })
 
@@ -40,11 +43,7 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
     Number(recipientEIN.value) !== ein
   )
 
-  const [transactionHash, setTransactionHash] = useState()
-
   const context = useWeb3Context()
-  const _1484 = useContract("1484")
-  const DAI = useContract("DAI")
   const snowMoResolver = useContract("SnowMoResolver")
   const snowflake = useContract("Snowflake")
 
@@ -58,21 +57,19 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
     validateCurrentRecipientAmount()
   }, [snowflakeBalance])
 
-  useEffect(() => {
-    if (transactionHash) {
-      context.library.once(transactionHash, () => {
-        setRecipientEIN({ value: '', error: null })
-        setRecipientAmount({ value: '', error: null })
-        context.forceAccountReRender()
-        setTransactionState('unsent')
-        setTransactionHash(null)
-      })
-      return () => context.library.removeAllListeners(transactionHash)
-    }
-  }, [transactionHash])
+  const [transactionHash, setTransactionHash] = useState()
 
-  function resetTransactionState () {
-    setTransactionState('unsent')
+  function addTransactionHash(transactionHash) {
+    setTransactionHash(transactionHash)
+  }
+
+  function removeTransactionHash() {
+    setTransactionHash(undefined)
+  }
+
+  function resetForm () {
+    setRecipientEIN({ value: '', error: null })
+    setRecipientAmount({ value: '', error: null })
   }
 
   async function getSignedPermission (transactionBytes) {
@@ -82,7 +79,7 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
       ['bytes1', 'bytes1', 'address', 'string', 'uint256', 'address', 'uint256', 'bytes', 'uint256'],
       [
         '0x19', '0x00', snowflake.address, 'I authorize this allow and call.',
-        ein, snowMoResolver.address, fromDecimal(recipientAmount.value, 18), transactionBytes, nonce.toString()
+        ein, snowMoResolver.address, ethers.utils.parseUnits(recipientAmount.value, 18), transactionBytes, nonce.toString()
       ]
     ))
 
@@ -90,66 +87,26 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
       .then(signature => ethers.utils.splitSignature(signature))
   }
 
-  const [transactionState, setTransactionState] = useState('unsent')
-
-  async function sendTransaction () {
-    setTransactionState('waiting')
-
-    async function getEncodedSendTo () {
-      // encode snowMoResolver.functions.sendTo
-      const functionSelector = ethers.utils.hexDataSlice(
-        ethers.utils.id('sendTo(uint256,uint256,uint256,string)'), 0, 4
-      )
-      const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
-        ['uint256', 'uint256', 'uint256', 'string'],
-        [ein, recipientEIN.value, fromDecimal(recipientAmount.value, 18), '']
-      )
-      const transactionBytes = `${functionSelector}${abiEncodedArguments.substring(2)}`
-
-      return transactionBytes
-    }
-
-    async function getEncodedForceWithdrawToVia () {
-      // encode snowMoResolver.functions.forceWithdrawToVia
-      const functionSelector = ethers.utils.hexDataSlice(
-        ethers.utils.id('forceWithdrawToVia(uint256,address,uint256,address,string)'), 0, 4
-      )
-
-      const recipientIdentity = await _1484.functions.getIdentity(recipientEIN.value)
-      const addressTo = recipientIdentity.associatedAddresses[0]
-
-      const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
-        ['uint256', 'address', 'uint256', 'address', 'string'],
-        [ein, addressTo, fromDecimal(recipientAmount.value, 18), DAI.address, '']
-      )
-      const transactionBytes = `${functionSelector}${abiEncodedArguments.substring(2)}`
-
-      return transactionBytes
-    }
-
-    const defaultIsHYDRO = (await snowMoResolver.functions.tokenPreferences(ein)) === ethers.constants.AddressZero
-
-    const transactionBytes = await (defaultIsHYDRO ? getEncodedSendTo() : getEncodedForceWithdrawToVia())
+  async function method () {
+    // encode snowMoResolver.functions.sendTo
+    const functionSelector = ethers.utils.hexDataSlice(
+      ethers.utils.id('sendTo(uint256,uint256,uint256,string)'), 0, 4
+    )
+    const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
+      ['uint256', 'uint256', 'uint256', 'string'],
+      [ein, recipientEIN.value, ethers.utils.parseUnits(recipientAmount.value, 18), '']
+    )
+    const transactionBytes = `${functionSelector}${abiEncodedArguments.substring(2)}`
 
     const permission = await getSignedPermission(transactionBytes)
 
     const to = snowflake.address
     const transactionData = snowflake.interface.functions.allowAndCallDelegated.encode([
-      snowMoResolver.address, fromDecimal(recipientAmount.value, 18), transactionBytes, wallet.address,
+      snowMoResolver.address, ethers.utils.parseUnits(recipientAmount.value, 18), transactionBytes, wallet.address,
       permission.v, permission.r, permission.s
     ])
 
-    fetch('/.netlify/functions/provider', { method: 'POST', body: JSON.stringify({ to, transactionData }) })
-      .then(async response => {
-        const json = await response.json()
-        if (response.status !== 200) throw Error(json.message)
-        return json
-      })
-      .then(json => setTransactionHash(json.transactionHash))
-      .catch(error => {
-        console.error(error)
-        setTransactionState('error')
-      })
+    return { to, transactionData }
   }
 
   function validateCurrentRecipientEIN () {
@@ -179,42 +136,100 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
 
   return (
     <>
-      <Typography variant='h5' align='center' >
-        Send HYDRO
-      </Typography>
+      <div className={classes.title}>
+        <Typography variant='h5' align='center' >
+          Send Hydro
+        </Typography>
+      </div>
 
       <form>
         <div className={classes.inputWrapper}>
-          <TextField
-            disabled={transactionState === 'waiting'}
-            className={classes.input}
-            label="To"
-            helperText={recipientEIN.error ? recipientEIN.error : "The EIN you want to send tokens to."}
-            error={!!recipientEIN.error}
-            value={recipientEIN.value}
-            onChange={updateRecipientEIN}
-          />
-          <TextField
-            disabled={transactionState === 'waiting'}
-            className={classes.input}
-            label="Amount"
-            helperText={recipientAmount.error ? recipientAmount.error : "The number of tokens you want to send."}
-            error={!!recipientAmount.error}
-            value={recipientAmount.value}
-            onChange={updateRecipientAmount}
-          />
-          <div className={classes.button}>
-            <Button
-              disabled={!canSend || transactionState === 'waiting'} variant='contained' color='secondary'
-              onClick={transactionState === 'unsent' ? sendTransaction : resetTransactionState}
-            >
-              {transactionState === 'error' && 'Error. Try Again?'}
-              {transactionState === 'unsent' && 'Send'}
-              {transactionState === 'waiting' && 'Waiting on Confirmation...'}
-            </Button>
-          </div>
+          <TransactionController
+            method={method}
+            onTransactionHash={addTransactionHash}
+            onReceipt={removeTransactionHash}
+            onReset={resetForm}
+          >
+            {(transactionState, transactionControllers) => {
+              function getButton () {
+                switch (transactionState) {
+                  case 'unsent': {
+                    return (
+                      <Button
+                        disabled={!canSend}
+                        variant='contained' color='secondary'
+                        onClick={transactionControllers.sendTransaction}
+                      >
+                        Send
+                      </Button>
+                    )
+                  }
+                  case 'waitingOnTransactionHash':
+                  case 'waitingOnConfirmation': {
+                    return (
+                      <Button
+                        disabled={true}
+                        variant='contained' color='secondary'
+                      >
+                        Waiting on Confirmation...
+                      </Button>
+                    )
+                  }
+                  case 'receipt': {
+                    return (
+                      <Button
+                        variant='contained' color='secondary'
+                        onClick={transactionControllers.resetTransaction}
+                      >
+                        Success! Send again?
+                      </Button>
+                    )
+                  }
+                  case 'error': {
+                    return (
+                      <Button
+                        variant='contained' color='secondary'
+                        onClick={transactionControllers.resetTransaction}
+                      >
+                        Error. Try again?
+                      </Button>
+                    )
+                  }
+                  default:
+                    return null
+                }
+              }
+
+              return (
+                <>
+                  <TextField
+                    disabled={transactionState !== 'unsent'}
+                    className={classes.input}
+                    label="To"
+                    helperText={recipientEIN.error ? recipientEIN.error : "The EIN you want to send tokens to."}
+                    error={!!recipientEIN.error}
+                    value={recipientEIN.value}
+                    onChange={updateRecipientEIN}
+                  />
+                  <TextField
+                    disabled={transactionState !== 'unsent'}
+                    className={classes.input}
+                    label="Amount"
+                    helperText={recipientAmount.error ? recipientAmount.error : "The number of tokens you want to send."}
+                    error={!!recipientAmount.error}
+                    value={recipientAmount.value}
+                    onChange={updateRecipientAmount}
+                  />
+                  <div className={classes.button}>
+                    {getButton()}
+                  </div>
+                </>
+              )
+            }}
+          </TransactionController>
         </div>
       </form>
+
       <div>
         <Snackbar
           anchorOrigin={{

@@ -1,14 +1,21 @@
 import React, { useState, useReducer, useEffect, useRef } from 'react'
+import Tabs from '@material-ui/core/Tabs';
+import Tab from '@material-ui/core/Tab';
+import WalletIcon from '@material-ui/icons/AccountBalanceWallet';
+import StoreIcon from '@material-ui/icons/Store';
+import IconButton from '@material-ui/core/IconButton';
+import SettingsIcon from '@material-ui/icons/Settings';
 import { makeStyles } from '@material-ui/styles';
-import { useWeb3Context } from 'web3-react/hooks'
-import { toDecimal } from 'web3-react/utilities'
-import { useNetworkEffect } from 'web3-react/hooks'
-import { ethers } from 'ethers'
+import { useWeb3Context } from 'web3-react'
+import { utils } from 'ethers'
 
-import { useContract } from '../hooks/general'
+import { ReactComponent as Spinner } from '../assets/spinner.svg'
+import { useContract, useBlockValue } from '../hooks'
+import SettingsModal from '../components/SettingsModal'
 import Header from '../components/Header'
 import SendTo from '../components/SendTo'
 import Logs from '../components/Logs'
+import BuyFrom from '../components/BuyFrom';
 
 const useStyles = makeStyles(theme => ({
   wrapper: {
@@ -32,6 +39,25 @@ const useStyles = makeStyles(theme => ({
     display: 'flex',
     justifyContent: 'center',
     marginTop: '1em'
+  },
+  settingsIcon: {
+    right: '-.75em',
+    top: '-.75em',
+    padding: '.25em !important',
+  },
+  settingsWrapper: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: '-.75em',
+  },
+  navigation: {
+    marginBottom: '1em',
+  },
+  spinner: {
+    fill: theme.palette.secondary.main
+  },
+  spinnerWrapper: {
+    margin: 'auto'
   }
 }))
 
@@ -61,14 +87,19 @@ function logsReducer (state, action) {
   }
 }
 
-export default function Home ({ wallet, removePrivateKey, ein }) {
+export default function Home ({
+  wallet, ein,
+  creationTransactionHash,
+  currentTransactionHash, setCurrentTransactionHash, removeCurrentTransactionHash,
+  removeStepCompleted, removeCreationTransactionHash, removePrivateKey
+}) {
   const classes = useStyles()
   const context = useWeb3Context()
-  const DAI = useContract("DAI")
   const _1484 = useContract("1484")
   const snowflake = useContract("Snowflake")
   const [logs, dispatchLogs] = useReducer(logsReducer, {})
 
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false)
   const snowMoResolver = useContract("SnowMoResolver")
 
   function initializeFilters (logName) {
@@ -92,18 +123,18 @@ export default function Home ({ wallet, removePrivateKey, ein }) {
       log.transferType = 'Received'
     }
 
-    // add einTo to WithdrawFromVia logs
+    // add identities to WithdrawFromVia logs
     if (!log.decoded.einTo && log.decoded.to) {
       const receipt = await context.library.getTransactionReceipt(log.transactionHash)
       const uniswapTransfer = receipt.logs.filter(
         l => l.topics[0] === "0xcd60aa75dea3072fbc07ae6d7d856b5dc5f4eee88854f5b4abf7b680ef8bc50f"
       )[0]
 
-      const daiAmount = ethers.utils.defaultAbiCoder.decode(['uint256'], uniswapTransfer.topics[3])
-      log.daiAmount = daiAmount
+      const daiAmount = utils.defaultAbiCoder.decode(['uint256'], uniswapTransfer.topics[3])
+      log.daiAmount = daiAmount[0]
 
-      const einTo = await _1484.functions.getEIN(log.decoded.to)
-      log.einTo = einTo
+      const identityTo = 'Dai-llor General'
+      log.identityTo = identityTo
     }
 
     return log
@@ -117,6 +148,12 @@ export default function Home ({ wallet, removePrivateKey, ein }) {
     },
     {}
   ))
+
+  function resetDemo () {
+    removeStepCompleted()
+    removeCreationTransactionHash()
+    removePrivateKey()
+  }
 
   // add .on listeners to SnowMo contract for all filters
   useEffect(() => {
@@ -142,75 +179,83 @@ export default function Home ({ wallet, removePrivateKey, ein }) {
     })
   }, [])
 
-  // on the (very) off chance the wallet has an EIN but no SnowMoSignup event, clear their wallet
+  // this clears wallets if we've migrated Snowflake/Resolver addresses
   useEffect(() => {
     if (logs.SnowMoSignup && logs.SnowMoSignup.length === 0)
       removePrivateKey()
   }, [logs.SnowMoSignup])
 
   // keep track of stuff that can change every block
-  const [maxEIN, setMaxEIN] = useState()
-  const [snowflakeBalance, setSnowflakeBalance] = useState()
-  const [daiBalance, setDaiBalance] = useState()
-  const [currencyPreference, setCurrencyPreference] = useState()
+  const maxEIN = useBlockValue(async () => {
+    return _1484.functions.nextEIN()
+      .then(latestMaxEIN => latestMaxEIN.toNumber())
+  }, [])
 
-  function updateMaxEIN () {
-    _1484.functions.nextEIN()
-      .then(latestMaxEIN => {
-        if (latestMaxEIN.toNumber() !== maxEIN)
-          setMaxEIN(latestMaxEIN.toNumber())
-      })
-  }
-
-  function updateSnowflakeBalance () {
-    snowflake.functions.deposits(ein)
+  const snowflakeBalance = useBlockValue(async () => {
+    return snowflake.functions.deposits(ein)
       .then(latestSnowflakeBalance => {
-        const newSnowflakeBalance = Number(toDecimal(latestSnowflakeBalance.toString(10), 18))
-        if (newSnowflakeBalance !== snowflakeBalance)
-          setSnowflakeBalance(newSnowflakeBalance)
+        return Number(utils.formatUnits(latestSnowflakeBalance, 18))
       })
-  }
+  }, [ein])
 
-  function updateDaiBalance () {
-    DAI.functions.balanceOf(wallet.address)
-      .then(latestDAIBalance => {
-        const newDAIBalance = Number(toDecimal(latestDAIBalance.toString(10), 18))
-        const formattedDAIBalance = newDAIBalance === 0 ? 0 : (newDAIBalance < .01 ? .01 : Math.round(newDAIBalance * 100) / 100)
+  const [isWallet, setIsWallet] = useState(0)
 
-        if (newDAIBalance !== daiBalance)
-          setDaiBalance(formattedDAIBalance)
-      })
-  }
+  const [showSpinner, setShowSpinner] = useState(false)
+  useEffect(() => {
+    if (!snowflakeBalance || true) {
+      const timeout = setTimeout(() => setShowSpinner(true), 500)
+      return () => clearTimeout(timeout)
+    }
+  }, [snowflakeBalance])
 
-  function updateCurrencyPreference () {
-    snowMoResolver.functions.tokenPreferences(ein)
-      .then(result => {
-        if (result !== currencyPreference)
-          setCurrencyPreference(result)
-      })
-  }
+  return !snowflakeBalance
+    ? (
+      <div className={classes.spinnerWrapper}>
+        {showSpinner && <Spinner className={classes.spinner} />}
+      </div>
+    )
+    : (
+      <div className={classes.wrapper}>
+        <div className={classes.settingsWrapper}>
+          <IconButton className={classes.settingsIcon} onClick={() => setSettingsModalOpen(true)}>
+            <SettingsIcon />
+          </IconButton>
+        </div>
 
-  useNetworkEffect(() => {
-    updateMaxEIN()
-    updateSnowflakeBalance()
-    updateDaiBalance()
-    updateCurrencyPreference()
-    context.library.on('block', updateMaxEIN)
-    context.library.on('block', updateSnowflakeBalance)
-    context.library.on('block', updateDaiBalance)
-    context.library.on('block', updateCurrencyPreference)
-    return () => context.library.removeAllListeners('block')
-  })
+        <SettingsModal
+          wallet={wallet}
+          creationTransactionHash={creationTransactionHash}
+          resetDemo={resetDemo}
+          open={settingsModalOpen} onClose={() => setSettingsModalOpen(false)}
+        />
 
-  return (
-    <div className={classes.wrapper}>
-      <Header
-        log={logs.SnowMoSignup} wallet={wallet} ein={ein}
-        snowflakeBalance={snowflakeBalance} daiBalance={daiBalance} currencyPreference={currencyPreference}
-        removePrivateKey={removePrivateKey}
-      />
-      <SendTo wallet={wallet} ein={ein} maxEIN={maxEIN} snowflakeBalance={snowflakeBalance} />
-      <Logs logs={logs} logNames={Object.keys(logFilterArguments)} />
-    </div>
+        <Header
+          wallet={wallet} ein={ein}
+          snowflakeBalance={snowflakeBalance}
+        />
+
+        <Tabs
+          value={isWallet}
+          onChange={() => setIsWallet(v => v === 0 ? 1 : 0)}
+          variant='fullWidth'
+          centered
+          indicatorColor="secondary"
+          textColor="secondary"
+          classes={{root: classes.navigation}}
+        >
+          <Tab icon={<WalletIcon />} label="Wallet" />
+          <Tab icon={<StoreIcon />} label="Store" />
+        </Tabs>
+
+        {isWallet === 0
+          ? (
+            <SendTo wallet={wallet} ein={ein} maxEIN={maxEIN} snowflakeBalance={snowflakeBalance} />
+          )
+          : (
+            <BuyFrom wallet={wallet} ein={ein} snowflakeBalance={snowflakeBalance} hasPurchased={logs && logs.WithdrawFromVia.some(log => !!log.identityTo)} />
+          )
+        }
+        <Logs logs={logs} logNames={Object.keys(logFilterArguments)} />
+      </div>
   )
 }
