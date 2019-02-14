@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import Button from '@material-ui/core/Button'
 import TextField from '@material-ui/core/TextField'
-import Snackbar from '@material-ui/core/Snackbar';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
-import { useWeb3Context } from 'web3-react'
 import { ethers } from 'ethers'
 
 import TransactionController from './TransactionController'
-import { getEtherscanLink } from '../utilities'
 import { useContract } from '../hooks'
 
 const useStyles = makeStyles({
@@ -32,18 +29,21 @@ const useStyles = makeStyles({
   }
 })
 
-export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
+export default function SendTo ({
+  wallet, ein, maxEIN, snowflakeBalance,
+  currentTransactionHash, setCurrentTransactionHash
+}) {
   const classes = useStyles()
   const [recipientEIN, setRecipientEIN] = useState({value: '', error: null})
   const [recipientAmount, setRecipientAmount] = useState({value: '', error: null})
 
   const canSend = (
+    !currentTransactionHash && 
     recipientEIN.error === null && recipientAmount.error === null &&
     recipientEIN.value !== '' && recipientAmount.value !== '' &&
     Number(recipientEIN.value) !== ein
   )
 
-  const context = useWeb3Context()
   const snowMoResolver = useContract("SnowMoResolver")
   const snowflake = useContract("Snowflake")
 
@@ -57,14 +57,8 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
     validateCurrentRecipientAmount()
   }, [snowflakeBalance])
 
-  const [transactionHash, setTransactionHash] = useState()
-
   function addTransactionHash(transactionHash) {
-    setTransactionHash(transactionHash)
-  }
-
-  function removeTransactionHash() {
-    setTransactionHash(undefined)
+    setCurrentTransactionHash(transactionHash)
   }
 
   function resetForm () {
@@ -147,7 +141,6 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
           <TransactionController
             method={method}
             onTransactionHash={addTransactionHash}
-            onReceipt={removeTransactionHash}
             onReset={resetForm}
           >
             {(transactionState, transactionControllers) => {
@@ -229,25 +222,6 @@ export default function SendTo ({ wallet, ein, maxEIN, snowflakeBalance }) {
           </TransactionController>
         </div>
       </form>
-
-      <div>
-        <Snackbar
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'left',
-          }}
-          open={!!transactionHash}
-          message={<span>Waiting on Transaction...</span>}
-          action={[
-            <Button
-              component='a' target='_blank' href={getEtherscanLink(context.networkId, 'transaction', transactionHash)}
-              key="etherscan" size="small" color='secondary'
-            >
-              Link
-            </Button>
-          ]}
-        />
-      </div>
     </>
   )
 }

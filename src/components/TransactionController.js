@@ -8,13 +8,16 @@ export default function TransactionController ({
   const [transactionState, setTransactionState] = useState('unsent')
   const [transactionHash, setTransactionHash] = useState()
 
+  const [isMounted, setIsMounted] = useState(true)
+  useEffect(() =>  () => setIsMounted(false), [])
+
   useEffect(() => {
     if (transactionHash) {
-      context.library.once(transactionHash, () => {
-        onReceipt()
-        setTransactionState('receipt')
-      })
-      return () => context.library.removeAllListeners(transactionHash)
+      context.library.waitForTransaction(transactionHash)
+        .then(() => {
+          onReceipt()
+          setTransactionState('receipt')
+        })
     }
   }, [transactionHash])
 
@@ -48,5 +51,5 @@ export default function TransactionController ({
     setTransactionState('unsent')
   }
 
-  return children(transactionState, { sendTransaction, resetTransaction })
+  return isMounted && children(transactionState, { sendTransaction, resetTransaction })
 }

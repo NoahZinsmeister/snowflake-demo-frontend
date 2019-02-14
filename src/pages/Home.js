@@ -1,4 +1,7 @@
 import React, { useState, useReducer, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
+import Snackbar from '@material-ui/core/Snackbar';
+import Button from '@material-ui/core/Button'
 import Tabs from '@material-ui/core/Tabs';
 import Tab from '@material-ui/core/Tab';
 import WalletIcon from '@material-ui/icons/AccountBalanceWallet';
@@ -11,6 +14,7 @@ import { utils } from 'ethers'
 
 import { ReactComponent as Spinner } from '../assets/spinner.svg'
 import { useContract, useBlockValue } from '../hooks'
+import { getEtherscanLink } from '../utilities'
 import SettingsModal from '../components/SettingsModal'
 import Header from '../components/Header'
 import SendTo from '../components/SendTo'
@@ -91,7 +95,7 @@ export default function Home ({
   wallet, ein,
   creationTransactionHash,
   currentTransactionHash, setCurrentTransactionHash, removeCurrentTransactionHash,
-  removeStepCompleted, removeCreationTransactionHash, removePrivateKey
+  resetDemo, tab
 }) {
   const classes = useStyles()
   const context = useWeb3Context()
@@ -101,6 +105,14 @@ export default function Home ({
 
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
   const snowMoResolver = useContract("SnowMoResolver")
+
+  // unset the current transaction hash whenever it's mined
+  useEffect(() => {
+    if (currentTransactionHash) {
+      context.library.waitForTransaction(currentTransactionHash)
+        .then(() => removeCurrentTransactionHash())
+    }
+  }, [currentTransactionHash])
 
   function initializeFilters (logName) {
     return logFilterArguments[logName](ein, wallet.address).map(filterArgument => {
@@ -133,7 +145,7 @@ export default function Home ({
       const daiAmount = utils.defaultAbiCoder.decode(['uint256'], uniswapTransfer.topics[3])
       log.daiAmount = daiAmount[0]
 
-      const identityTo = 'Dai-llor General'
+      const identityTo = 'Dai-llar General'
       log.identityTo = identityTo
     }
 
@@ -148,12 +160,6 @@ export default function Home ({
     },
     {}
   ))
-
-  function resetDemo () {
-    removeStepCompleted()
-    removeCreationTransactionHash()
-    removePrivateKey()
-  }
 
   // add .on listeners to SnowMo contract for all filters
   useEffect(() => {
@@ -181,8 +187,9 @@ export default function Home ({
 
   // this clears wallets if we've migrated Snowflake/Resolver addresses
   useEffect(() => {
-    if (logs.SnowMoSignup && logs.SnowMoSignup.length === 0)
-      removePrivateKey()
+    if (logs.SnowMoSignup && logs.SnowMoSignup.length === 0) {
+      resetDemo()
+    }
   }, [logs.SnowMoSignup])
 
   // keep track of stuff that can change every block
@@ -198,7 +205,7 @@ export default function Home ({
       })
   }, [ein])
 
-  const [isWallet, setIsWallet] = useState(0)
+  const [isWallet, setIsWallet] = useState(tab === 'wallet' ? 0 : 1)
 
   const [showSpinner, setShowSpinner] = useState(false)
   useEffect(() => {
@@ -243,19 +250,45 @@ export default function Home ({
           textColor="secondary"
           classes={{root: classes.navigation}}
         >
-          <Tab icon={<WalletIcon />} label="Wallet" />
-          <Tab icon={<StoreIcon />} label="Store" />
+          <Tab component={Link} to={'/wallet'} icon={<WalletIcon />} label="Wallet" />
+          <Tab component={Link} to={'/store'} icon={<StoreIcon />} label="Store" />
         </Tabs>
 
         {isWallet === 0
           ? (
-            <SendTo wallet={wallet} ein={ein} maxEIN={maxEIN} snowflakeBalance={snowflakeBalance} />
+            <SendTo
+              wallet={wallet} ein={ein} maxEIN={maxEIN} snowflakeBalance={snowflakeBalance}
+              currentTransactionHash={currentTransactionHash}
+              setCurrentTransactionHash={setCurrentTransactionHash}
+            />
           )
           : (
-            <BuyFrom wallet={wallet} ein={ein} snowflakeBalance={snowflakeBalance} hasPurchased={logs && logs.WithdrawFromVia.some(log => !!log.identityTo)} />
+            <BuyFrom
+              wallet={wallet} ein={ein} snowflakeBalance={snowflakeBalance}
+              amountPurchased={logs && logs.WithdrawFromVia && logs.WithdrawFromVia.filter(log => !!log.identityTo).length}
+              currentTransactionHash={currentTransactionHash}
+              setCurrentTransactionHash={setCurrentTransactionHash}
+            />
           )
         }
         <Logs logs={logs} logNames={Object.keys(logFilterArguments)} />
+
+        <Snackbar
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          open={!!currentTransactionHash}
+          message={<span>Waiting on Transaction...</span>}
+          action={[
+            <Button
+              component='a' target='_blank' href={getEtherscanLink(context.networkId, 'transaction', currentTransactionHash)}
+              key="etherscan" size="small" color='secondary'
+            >
+              Link
+            </Button>
+          ]}
+        />
       </div>
   )
 }

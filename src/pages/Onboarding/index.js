@@ -55,7 +55,7 @@ const stepLabels = ['Select Avatar', 'Add Funds', 'Confirm Identity']
 // TODO add currency preference
 function Onboarding ({
   activeStep, stepCompleted, setStepCompleted,
-  setPrivateKey, wallet, creationTransactionHash, setCreationTransactionHash, reFetchEIN,
+  wallet, creationTransactionHash, setPrivateKeyAndCreationTransactionHash,
   history, location
 }) {
   const context = useWeb3Context()
@@ -80,10 +80,11 @@ function Onboarding ({
 
   function selectIdentityProceed (privateKey, transactionHash) {
     if (privateKey && transactionHash) {
-      setPrivateKey(privateKey)
-      setCreationTransactionHash(transactionHash)
+      setPrivateKeyAndCreationTransactionHash(privateKey, transactionHash, 0)
+      history.push(location.pathname, { activeStep: 1 })
+    } else {
+      completeStep(0)
     }
-    completeStep(0)
   }
 
   function fundProceed () {
@@ -91,7 +92,6 @@ function Onboarding ({
   }
 
   function confirmProceed () {
-    reFetchEIN()
     completeStep(2)
   }
 

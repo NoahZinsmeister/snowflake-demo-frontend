@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import Button from '@material-ui/core/Button'
-import Snackbar from '@material-ui/core/Snackbar';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
-import { useWeb3Context } from 'web3-react'
 import { ethers, utils } from 'ethers'
 import couch from '../assets/couch.png';
 
 import TransactionController from './TransactionController'
 import { Balances } from './IdentityCard'
-import { getEtherscanLink, daillarGeneralAddress } from '../utilities'
+import { daillarGeneralAddress } from '../utilities'
 import { useContract } from '../hooks'
 
 const useStyles = makeStyles({
@@ -34,7 +32,6 @@ const useStyles = makeStyles({
     userSelect: 'none'
   },
   couchWrapper: {
-    marginTop: '2em',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',    
@@ -46,10 +43,15 @@ const useStyles = makeStyles({
   },
   title: {
     marginTop: '2em'
+  },
+  ownedCount: {
+    margin: '2em',
   }
 })
 
-export default function BuyFrom ({ wallet, ein, hasPurchased, snowflakeBalance }) {
+export default function BuyFrom ({
+  wallet, ein, amountPurchased, snowflakeBalance, currentTransactionHash, setCurrentTransactionHash
+}) {
   const classes = useStyles()
 
   const DaiExchange = useContract("DaiExchange")
@@ -60,7 +62,9 @@ export default function BuyFrom ({ wallet, ein, hasPurchased, snowflakeBalance }
   const [ethRequired, setEthRequired] = useState()
   const [hydroRequired, setHydroRequired] = useState()
 
-  const canSend = (!!hydroRequired && utils.formatUnits(roundAmount(hydroRequired), 18) <= snowflakeBalance)
+  const canSend = (
+    !currentTransactionHash && !!hydroRequired && utils.formatUnits(roundAmount(hydroRequired), 18) <= snowflakeBalance
+  )
 
   useEffect(() => {
     DaiExchange.functions.getEthToTokenOutputPrice(daiAmount)
@@ -72,18 +76,11 @@ export default function BuyFrom ({ wallet, ein, hasPurchased, snowflakeBalance }
       HydroExchange.functions.getTokenToEthOutputPrice(ethRequired)
         .then(amount => setHydroRequired(amount))
   }, [ethRequired])
- 
-  const [transactionHash, setTransactionHash] = useState()
 
   function addTransactionHash(transactionHash) {
-    setTransactionHash(transactionHash)
+    setCurrentTransactionHash(transactionHash)
   }
 
-  function removeTransactionHash() {
-    setTransactionHash(undefined)
-  }
-
-  const context = useWeb3Context()
   const DAI = useContract("DAI")
   const snowMoResolver = useContract("SnowMoResolver")
   const snowflake = useContract("Snowflake")
@@ -138,96 +135,87 @@ export default function BuyFrom ({ wallet, ein, hasPurchased, snowflakeBalance }
         </Typography>
       </div>
 
+      {amountPurchased && amountPurchased >= 1 && (
+        <div className={classes.ownedCount}>
+          <Typography variant='body2' align='center'>
+            Congratulations! You're the proud owner of {amountPurchased} Dai-llar General {amountPurchased === 1 ? 'couch' : 'couches'}!
+          </Typography>
+        </div>
+      )}
+
       <div className={classes.couchWrapper}>
         <img src={couch} alt="Couch" className={classes.couch} />
       </div>
 
       <div className={classes.couchPriceWrapper}>
-        <Balances type='DAI' balance={1} showBadge={!hasPurchased} />
+        <Balances type='DAI' balance={1} showBadge={amountPurchased === 0} />
       </div>
 
-      {hasPurchased
-        ? (
-          <Typography variant='body2' align='center' >
-            Congratulations! You're the proud owner of a Dai-llar General couch!
+      {amountPurchased && (
+        <>
+          <Typography variant='body1' align='center' >
+            Welcome to the Dai-llar General! For just 1 DAI, you can purchase an exclusive digital couch. It looks like you only have HYDRO, but that's ok. Thanks to <a href='https://uniswap.io/' target='_blank' rel='noopener noreferrer'>Uniswap</a> and ERC1484, we can instantly transfer your HYDRO into DAI.
           </Typography>
-        )
-        : (
-          <>
-            <Typography variant='body1' align='center' >
-              Welcome to the Dai-llar General. For just 1 DAI, you can purchase our exclusive digital couch. It looks like you only have HYDRO, but that's ok! Thanks to <a href='https://uniswap.io/' target='_blank' rel='noopener noreferrer'>Uniswap</a> and ERC1484, we can instantly transfer your HYDRO into DAI!
-            </Typography>
 
-            <div className={classes.couchPriceWrapper}>
-              {hydroRequired && <Balances type='Hydro' balance={utils.formatUnits(roundAmount(hydroRequired), 18)} showBadge={false} />}
+          <div className={classes.couchPriceWrapper}>
+            {hydroRequired && <Balances type='Hydro' balance={utils.commify(utils.formatUnits(roundAmount(hydroRequired), 18))} showBadge={false} />}
 
-            <TransactionController
-              method={method}
-              onTransactionHash={addTransactionHash}
-              onReceipt={removeTransactionHash}
-            >
-              {(transactionState, transactionControllers) => {
-                switch (transactionState) {
-                  case 'unsent': {
-                    return (
-                      <Button
-                        disabled={!canSend}
-                        variant='contained' color='secondary'
-                        onClick={transactionControllers.sendTransaction}
-                      >
-                        Buy
-                      </Button>
-                    )
-                  }
-                  case 'waitingOnTransactionHash':
-                  case 'waitingOnConfirmation': {
-                    return (
-                      <Button
-                        disabled={true}
-                        variant='contained' color='secondary'
-                      >
-                        Purchasing...
-                      </Button>
-                    )
-                  }
-                  case 'error': {
-                    return (
-                      <Button
-                        variant='contained' color='secondary'
-                        onClick={transactionControllers.resetTransaction}
-                      >
-                        Error. Try again?
-                      </Button>
-                    )
-                  }
-                  default:
-                    return null
+          <TransactionController
+            method={method}
+            onTransactionHash={addTransactionHash}
+          >
+            {(transactionState, transactionControllers) => {
+              switch (transactionState) {
+                case 'unsent': {
+                  return (
+                    <Button
+                      disabled={!canSend}
+                      variant='contained' color='secondary'
+                      onClick={transactionControllers.sendTransaction}
+                    >
+                      Buy
+                    </Button>
+                  )
                 }
-              }}
-            </TransactionController>
-            </div>
-          </>
-        )
-      }
-
-      <div>
-        <Snackbar
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'left',
-          }}
-          open={!!transactionHash}
-          message={<span>Waiting on Transaction...</span>}
-          action={[
-            <Button
-              component='a' target='_blank' href={getEtherscanLink(context.networkId, 'transaction', transactionHash)}
-              key="etherscan" size="small" color='secondary'
-            >
-              Link
-            </Button>
-          ]}
-        />
-      </div>
+                case 'waitingOnTransactionHash':
+                case 'waitingOnConfirmation': {
+                  return (
+                    <Button
+                      disabled={true}
+                      variant='contained' color='secondary'
+                    >
+                      Purchasing...
+                    </Button>
+                  )
+                }
+                case 'receipt': {
+                  return (
+                    <Button
+                      variant='contained' color='secondary'
+                      onClick={transactionControllers.resetTransaction}
+                    >
+                      Success! Buy another?
+                    </Button>
+                  )
+                }
+                case 'error': {
+                  return (
+                    <Button
+                      variant='contained' color='secondary'
+                      onClick={transactionControllers.resetTransaction}
+                    >
+                      Error. Try again?
+                    </Button>
+                  )
+                }
+                default:
+                  return null
+              }
+            }}
+          </TransactionController>
+          </div>
+        </>
+      )}
     </>
   )
 }
