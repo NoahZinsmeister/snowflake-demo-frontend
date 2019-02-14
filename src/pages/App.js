@@ -79,7 +79,7 @@ function Initializer () {
     if (stepCompleted === 2) {
       reFetchEIN()
     }
-  }, stepCompleted)
+  }, [stepCompleted])
 
   // set up connector one-time
   // TODO add some basic error display here, just in case infura is unavailable

@@ -1,5 +1,26 @@
 import { useEffect, useState } from 'react'
-import { useWeb3Context } from 'web3-react';
+import { useWeb3Context } from 'web3-react'
+
+function wrapPromise(promiseToWrap) {
+  var cancelled = false
+
+  const promise = new Promise((resolve, reject) => {
+    promiseToWrap()
+      .then(v => {
+        if (!cancelled) {
+          resolve(v)
+        } else {
+          reject({ wasCancelled: true })
+        }
+      })
+  })
+
+  function cancel() {
+    cancelled = true
+  }
+
+  return { promise, cancel }
+}
 
 export default function TransactionController ({
   method, onClick = () => {}, onTransactionHash = () => {}, onReceipt = () => {}, onError = () => {}, onReset = () => {}, children
@@ -8,22 +29,28 @@ export default function TransactionController ({
   const [transactionState, setTransactionState] = useState('unsent')
   const [transactionHash, setTransactionHash] = useState()
 
-  const [isMounted, setIsMounted] = useState(true)
-  useEffect(() =>  () => setIsMounted(false), [])
-
   useEffect(() => {
     if (transactionHash) {
-      context.library.waitForTransaction(transactionHash)
+      const { promise, cancel } = wrapPromise(() => context.library.waitForTransaction(transactionHash))
+      promise
         .then(() => {
-          onReceipt()
           setTransactionState('receipt')
+          onReceipt()
         })
+        .catch(error => {
+          if (!error.wasCancelled) {
+            throw error
+          }
+        })
+      return () => cancel()
+    } else {
+      return () => { }
     }
   }, [transactionHash])
 
   async function sendTransaction () {
-    onClick()
     setTransactionState('waitingOnTransactionHash')
+    onClick()
     
     const { to, transactionData } = await method()
 
@@ -35,21 +62,21 @@ export default function TransactionController ({
       })
       .then(json => {
         const { transactionHash } = json
-        onTransactionHash(transactionHash)
-        setTransactionHash(transactionHash)
         setTransactionState('waitingOnConfirmation')
+        setTransactionHash(transactionHash)
+        onTransactionHash(transactionHash)
       })
       .catch(error => {
+        setTransactionState('error')
         onError(error)
-        setTransactionState('error')        
       })
   }
 
   function resetTransaction () {
-    onReset()
     setTransactionHash(undefined)
     setTransactionState('unsent')
+    onReset()
   }
 
-  return isMounted && children(transactionState, { sendTransaction, resetTransaction })
+  return children(transactionState, { sendTransaction, resetTransaction })
 }

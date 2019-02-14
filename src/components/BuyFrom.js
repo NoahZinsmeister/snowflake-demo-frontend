@@ -77,10 +77,6 @@ export default function BuyFrom ({
         .then(amount => setHydroRequired(amount))
   }, [ethRequired])
 
-  function addTransactionHash(transactionHash) {
-    setCurrentTransactionHash(transactionHash)
-  }
-
   const DAI = useContract("DAI")
   const snowMoResolver = useContract("SnowMoResolver")
   const snowflake = useContract("Snowflake")
@@ -135,13 +131,13 @@ export default function BuyFrom ({
         </Typography>
       </div>
 
-      {amountPurchased && amountPurchased >= 1 && (
-        <div className={classes.ownedCount}>
+      <div className={classes.ownedCount}>
+        {Number.isInteger(amountPurchased) && amountPurchased >= 1 && (
           <Typography variant='body2' align='center'>
             Congratulations! You're the proud owner of {amountPurchased} Dai-llar General {amountPurchased === 1 ? 'couch' : 'couches'}!
           </Typography>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className={classes.couchWrapper}>
         <img src={couch} alt="Couch" className={classes.couch} />
@@ -151,7 +147,7 @@ export default function BuyFrom ({
         <Balances type='DAI' balance={1} showBadge={amountPurchased === 0} />
       </div>
 
-      {amountPurchased && (
+      {Number.isInteger(amountPurchased) && (
         <>
           <Typography variant='body1' align='center' >
             Welcome to the Dai-llar General! For just 1 DAI, you can purchase an exclusive digital couch. It looks like you only have HYDRO, but that's ok. Thanks to <a href='https://uniswap.io/' target='_blank' rel='noopener noreferrer'>Uniswap</a> and ERC1484, we can instantly transfer your HYDRO into DAI.
@@ -162,7 +158,7 @@ export default function BuyFrom ({
 
           <TransactionController
             method={method}
-            onTransactionHash={addTransactionHash}
+            onTransactionHash={setCurrentTransactionHash}
           >
             {(transactionState, transactionControllers) => {
               switch (transactionState) {
