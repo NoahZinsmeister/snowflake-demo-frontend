@@ -29,6 +29,9 @@ export default function TransactionController ({
   const [transactionState, setTransactionState] = useState('unsent')
   const [transactionHash, setTransactionHash] = useState()
 
+  const [isMounted, setIsMounted] = useState(true)
+  useEffect(() => () => setIsMounted(false), [])
+
   useEffect(() => {
     if (transactionHash) {
       const { promise, cancel } = wrapPromise(() => context.library.waitForTransaction(transactionHash))
@@ -78,5 +81,5 @@ export default function TransactionController ({
     onReset()
   }
 
-  return children(transactionState, { sendTransaction, resetTransaction })
+  return isMounted && children(transactionState, { sendTransaction, resetTransaction })
 }

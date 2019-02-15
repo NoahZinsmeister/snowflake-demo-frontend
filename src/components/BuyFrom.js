@@ -18,13 +18,12 @@ const useStyles = makeStyles({
     flexDirection: 'row',
     flexWrap: 'wrap'
   },
-  input: {
+  flexed: {
+    display: 'flex',
     flex: '1 1 auto',
     margin: '1em !important',
-  },
-  button: {
-    flex: '0 1 auto',
-    margin: '1em !important',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   couch: {
     width: '80%',
@@ -39,7 +38,9 @@ const useStyles = makeStyles({
   couchPriceWrapper: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap'    
   },
   title: {
     marginTop: '2em'
@@ -150,65 +151,73 @@ export default function BuyFrom ({
       {Number.isInteger(amountPurchased) && (
         <>
           <Typography variant='body1' align='center' >
-            Welcome to the Dai-llar General! For just 1 DAI, you can purchase an exclusive digital couch. It looks like you only have HYDRO, but that's ok. Thanks to <a href='https://uniswap.io/' target='_blank' rel='noopener noreferrer'>Uniswap</a> and ERC1484, we can instantly transfer your HYDRO into DAI.
+            Welcome to the Dai-llar General! For just 1 DAI, you can purchase an exclusive digital couch. It looks like you only have HYDRO, but that's ok. Thanks to <a href='https://uniswap.io/' target='_blank' rel='noopener noreferrer'>Uniswap</a> and <a href='https://erc1484.org/' target='_blank' rel='noopener noreferrer'>ERC1484</a>, we can instantly transfer your HYDRO into DAI.
           </Typography>
 
           <div className={classes.couchPriceWrapper}>
-            {hydroRequired && <Balances type='Hydro' balance={utils.commify(utils.formatUnits(roundAmount(hydroRequired), 18))} showBadge={false} />}
+            {hydroRequired && (
+              <div className={classes.flexed}>
+                <Balances
+                  type='Hydro' balance={utils.commify(Math.round(Number(utils.formatUnits(roundAmount(hydroRequired), 18))))} showBadge={false}
+                />
+              </div>
+            )}
 
-          <TransactionController
-            method={method}
-            onTransactionHash={setCurrentTransactionHash}
-          >
-            {(transactionState, transactionControllers) => {
-              switch (transactionState) {
-                case 'unsent': {
-                  return (
-                    <Button
-                      disabled={!canSend}
-                      variant='contained' color='secondary'
-                      onClick={transactionControllers.sendTransaction}
-                    >
-                      Buy
-                    </Button>
-                  )
-                }
-                case 'waitingOnTransactionHash':
-                case 'waitingOnConfirmation': {
-                  return (
-                    <Button
-                      disabled={true}
-                      variant='contained' color='secondary'
-                    >
-                      Purchasing...
-                    </Button>
-                  )
-                }
-                case 'receipt': {
-                  return (
-                    <Button
-                      variant='contained' color='secondary'
-                      onClick={transactionControllers.resetTransaction}
-                    >
-                      Success! Buy another?
-                    </Button>
-                  )
-                }
-                case 'error': {
-                  return (
-                    <Button
-                      variant='contained' color='secondary'
-                      onClick={transactionControllers.resetTransaction}
-                    >
-                      Error. Try again?
-                    </Button>
-                  )
-                }
-                default:
-                  return null
-              }
-            }}
-          </TransactionController>
+            <div className={classes.flexed}>
+              <TransactionController
+                method={method}
+                onTransactionHash={setCurrentTransactionHash}
+              >
+                {(transactionState, transactionControllers) => {
+                  switch (transactionState) {
+                    case 'unsent': {
+                      return (
+                        <Button
+                          disabled={!canSend}
+                          variant='contained' color='secondary'
+                          onClick={transactionControllers.sendTransaction}
+                        >
+                          Buy
+                        </Button>
+                      )
+                    }
+                    case 'waitingOnTransactionHash':
+                    case 'waitingOnConfirmation': {
+                      return (
+                        <Button
+                          disabled={true}
+                          variant='contained' color='secondary'
+                        >
+                          Purchasing...
+                        </Button>
+                      )
+                    }
+                    case 'receipt': {
+                      return (
+                        <Button
+                          variant='contained' color='secondary'
+                          onClick={transactionControllers.resetTransaction}
+                        >
+                          Success! Buy another?
+                        </Button>
+                      )
+                    }
+                    case 'error': {
+                      return (
+                        <Button
+                          variant='contained' color='secondary'
+                          onClick={transactionControllers.resetTransaction}
+                        >
+                          Error. Try again?
+                        </Button>
+                      )
+                    }
+                    default:
+                      return null
+                  }
+                }}
+              </TransactionController>
+            </div>
           </div>
         </>
       )}

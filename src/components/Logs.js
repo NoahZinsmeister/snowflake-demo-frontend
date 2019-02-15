@@ -1,18 +1,8 @@
-import React, { useState } from 'react'
-import ExpansionPanel from '@material-ui/core/ExpansionPanel';
-import ExpansionPanelSummary from '@material-ui/core/ExpansionPanelSummary';
-import ExpansionPanelDetails from '@material-ui/core/ExpansionPanelDetails';
+import React from 'react'
 import Typography from '@material-ui/core/Typography';
-import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
-import Table from '@material-ui/core/Table';
-import TableBody from '@material-ui/core/TableBody';
-import TableCell from '@material-ui/core/TableCell';
-import TableHead from '@material-ui/core/TableHead';
-import TableRow from '@material-ui/core/TableRow';
-import DateIcon from '@material-ui/icons/DateRangeSharp';
-import Checkbox from '@material-ui/core/Checkbox';
+import Chip from '@material-ui/core/Chip';
+import MUIDataTable from "mui-datatables";
 import { makeStyles } from '@material-ui/styles';
-import { useWeb3Context } from 'web3-react'
 import { utils } from 'ethers'
 import moment from 'moment'
 
@@ -20,35 +10,73 @@ import { getEtherscanLink } from '../utilities'
 import { ReactComponent as DaiLogo } from '../assets/dai.svg'
 import { ReactComponent as HydroLogo } from '../assets/hydro.svg'
 
+const columns = [
+  {
+    name: 'Type',
+    options: {
+      customBodyRender: value => {
+        return value === 'Sent'
+          ? <Chip label={value} style={{ color: 'white', backgroundColor: 'red' }} />
+          : <Chip label={value} style={{ color: 'white', backgroundColor: 'green' }} />
+      }
+    }
+  },
+  'Counterparty',
+  {
+    name: 'Currency',
+    options: {
+      customBodyRender: value => {
+        return value === 'DAI'
+          ? <DaiLogo style={{height: '2em'}} />
+          : <HydroLogo style={{ height: '2em' }} />
+      }
+    }
+  },
+  'Amount',
+  {
+    name: 'Time',
+    options: {
+      customBodyRender: value => {
+        return moment().diff(moment.unix(value), 'hours', true) < 1
+          ? moment.unix(value).fromNow()
+          : moment.unix(value).calendar()
+      }
+    }
+  },
+  {
+    name: 'Transaction',
+    options: {
+      customBodyRender: value => (
+        <a
+          href={getEtherscanLink(4, 'transaction', value)} // TODO refacor from static
+          target='_blank'
+          rel='noopener noreferrer'
+        >
+          {value.substring(0, 6)}
+          ...
+          {value.substring(value.length - 4)}
+        </a>
+      )
+    }
+  }
+]
+
+const options = {
+  expandableRows: false,
+  rowsPerPage: 5,
+  rowsPerPageOptions: [5, 10, 25, 50],
+  responsive: 'scroll',
+  print: false,
+  search: false,
+  sort: false,
+  filter: false,
+  selectableRows: false,
+  rowHover: false
+}
+
 const useStyles = makeStyles({
   title: {
-    padding: '.75em'
-  },
-  checkboxCell: {
-    whiteSpace: 'nowrap',
-  },
-  checkbox: {
-    marginLeft: '.25em !important',
-    padding: '0 !important',
-  },
-  tableRoot: {
-    width: '100%',
-    overflowX: 'auto'
-  },
-  table: {
-    tableLayout: 'fixed'
-  },
-  logo: {
-    height: '1em'
-  },
-  panel: {
-    marginTop: '2em',
-    borderRadius: '5px',
-  },
-  noBefore: {
-    '&:before': {
-      height: '0 !important'
-    }
+    marginTop: '2em'
   }
 })
 
@@ -56,12 +84,9 @@ const useStyles = makeStyles({
 // TODO investigate potentially unnecessary re-renders when logs are added by the .on event listener
 export default function Logs ({ logs, logNames }) {
   const classes = useStyles()
-  const context = useWeb3Context()
   const allLogsLoaded = logNames.every(logName => logName in logs)
 
-  const [absoluteDates, setAbsoluteDates] = useState(false)
-
-  function getLogDisplayData () {
+  function getTable () {
     if (!allLogsLoaded) return (
       <Typography variant='body1' align='center' paragraph={true}>
         Loading...
@@ -71,6 +96,7 @@ export default function Logs ({ logs, logNames }) {
     const validTransferFromLogs = logs.TransferFrom.filter(l => !l.removed)
     const validWithdrawFromViaLogs = logs.WithdrawFromVia.filter(l => !l.removed)
     const validLogs = validTransferFromLogs.concat(validWithdrawFromViaLogs)
+
     validLogs.sort((a, b) => {
       if (a.blockNumber > b.blockNumber) return 1
       if (a.blockNumber < b.blockNumber) return -1
@@ -81,88 +107,43 @@ export default function Logs ({ logs, logNames }) {
       return 0
     })
 
-    if (validLogs.length === 0) return (
-      <Typography variant='body1' align='center' paragraph={true}>
-        No Transfer History
-      </Typography>
-    )
+    validLogs.reverse()
+
+    const data = validLogs.map((log, i) => {
+      const identityTo = log.identityTo
+        ? log.identityTo
+        : (
+            log.transferType === 'Sent'
+              ? ((log.decoded.einTo && log.decoded.einTo.toNumber()) || log.einTo.toNumber())
+              : log.decoded.einFrom.toNumber()
+          )
+
+      const daiAmount = log.daiAmount && Math.round(Number(utils.formatUnits(log.daiAmount, 18)))
+      const isDai = !!daiAmount
+
+      return [
+        log.transferType,
+        identityTo,
+        isDai ? 'DAI' : 'HYDRO',
+        isDai ? daiAmount : Math.round(Number(utils.formatUnits(log.decoded.amount, 18))),
+        log.timestamp,
+        log.transactionHash
+      ]
+    })
 
     return (
-      <div className={classes.tableRoot}>
-        <Table className={classes.table}>
-          <TableHead>
-            <TableRow>
-              <TableCell align='right'>Type</TableCell>
-              <TableCell align='right'>Counterparty</TableCell>
-              <TableCell align='right'></TableCell>
-              <TableCell align='right'>Amount</TableCell>
-              <TableCell className={classes.checkboxCell}>
-                Time
-                <Checkbox
-                  className={classes.checkbox} icon={<DateIcon fontSize="small" />} checkedIcon={<DateIcon fontSize="small" />}
-                  onChange={() => setAbsoluteDates(!absoluteDates)}
-                />
-              </TableCell>
-              <TableCell align='right'>Transaction Hash</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {validLogs.reverse().map((log, i) => {
-              const relativeDate = moment().diff(moment.unix(log.timestamp), 'hours', true) < 1 ?
-                moment.unix(log.timestamp).fromNow() :
-                moment.unix(log.timestamp).calendar()
-
-              const daiAmount = log.daiAmount && Number(utils.formatUnits(log.daiAmount, 18))
-              const formattedDaiAmount = daiAmount && (daiAmount < .01 ? '<.01' : Math.round(daiAmount * 100) / 100)
-
-              return (
-                <TableRow key={i}>
-                  <TableCell align='right'>{log.transferType}</TableCell>
-                  <TableCell align='right'>
-                    {log.identityTo ? log.identityTo : (
-                      log.transferType === 'Sent' ?
-                      ((log.decoded.einTo && log.decoded.einTo.toNumber()) || log.einTo.toNumber()) :
-                      log.decoded.einFrom.toNumber()
-                    )
-                    }
-                  </TableCell>
-                  <TableCell align='right' padding='checkbox'>
-                    {formattedDaiAmount ? <DaiLogo className={classes.logo} /> : <HydroLogo className={classes.logo} />}
-                  </TableCell>
-                  <TableCell align='right'>
-                    {formattedDaiAmount ? formattedDaiAmount : utils.formatUnits(log.decoded.amount, 18)}
-                  </TableCell>
-                  <TableCell>{absoluteDates ? moment.unix(log.timestamp).format('L LT') : relativeDate}</TableCell>
-                  <TableCell align='right'>
-                    <a
-                      href={getEtherscanLink(context.networkId, 'transaction', log.transactionHash)}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                    >
-                      {log.transactionHash.substring(0, 6)}
-                      ...
-                      {log.transactionHash.substring(log.transactionHash.length - 4)}
-                    </a>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      <MUIDataTable
+        title="Transfer History"
+        data={data}
+        columns={columns}
+        options={options}
+      />
     )
   }
 
   return (
-    <>
-      <ExpansionPanel className={classes.panel} classes={{root: classes.noBefore}}>
-        <ExpansionPanelSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant='h6'>Transfer History</Typography>
-        </ExpansionPanelSummary>
-        <ExpansionPanelDetails>
-          {getLogDisplayData()}
-        </ExpansionPanelDetails>
-      </ExpansionPanel>
-    </>
+    <div className={classes.title}>
+      {getTable()}
+    </div>
   )
 }
