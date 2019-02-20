@@ -12,7 +12,7 @@ export default function CreateIdentity ({ wallet, onClick, onTransactionHash, on
   const timestamp = useRef(Math.round(new Date() / 1000) - 120)
 
   const identityCreationMessage = useMemo(() => {
-    if (wallet)
+    if (wallet) {
       return utils.arrayify(utils.solidityKeccak256(
         ['bytes1', 'bytes1', 'address', 'string', 'address', 'address', 'address[]', 'address[]', 'uint256'],
         [
@@ -20,6 +20,7 @@ export default function CreateIdentity ({ wallet, onClick, onTransactionHash, on
           wallet.address, wallet.address, [snowflakeAddress, demoHelper.address], [], timestamp.current
         ]
       ))
+    }
   }, [wallet])
 
   const [signature, setSignature] = useState()

@@ -11,6 +11,7 @@ import SettingsIcon from '@material-ui/icons/Settings';
 import { makeStyles } from '@material-ui/styles';
 import { useWeb3Context } from 'web3-react'
 import { utils } from 'ethers'
+import EthCrypto from 'eth-crypto'
 
 import { ReactComponent as Spinner } from '../assets/spinner.svg'
 import { useContract, useBlockValue } from '../hooks'
@@ -129,10 +130,21 @@ export default function Home ({
     log.timestamp = timestamp
 
     // add the transfer type
-    if (log.decoded.einFrom && (log.decoded.einFrom.toNumber() === ein)) {
-      log.transferType = 'Sent'
-    } else {
-      log.transferType = 'Received'
+    if (log.decoded.einFrom) {
+      if (log.decoded.einFrom.toNumber() === ein) {
+        log.transferType = 'Sent'
+        if (log.decoded.message !== '') {
+          log.decodedMessage = '<Encrypted>'
+        }
+      } else {
+        log.transferType = 'Received'
+        if (log.decoded.message !== '') {
+          const decompressed = EthCrypto.hex.decompress(log.decoded.message, true)
+          const parsed = EthCrypto.cipher.parse(decompressed.substring(2))
+          const decrypted = await EthCrypto.decryptWithPrivateKey(wallet.privateKey, parsed)
+          log.decodedMessage = decrypted
+        }
+      }
     }
 
     // add identities to WithdrawFromVia logs

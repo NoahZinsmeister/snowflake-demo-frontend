@@ -13,17 +13,13 @@ import { getEtherscanLink } from '../utilities'
 const useStyles = makeStyles({
   centered: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
     flexDirection: 'column',
-    margin: '1em'
+    alignItems: 'center',
+    margin: '1em',
+    overflowY: 'scroll',
   },
   spacer: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'column',
-    margin: '1em'
+    marginBottom: '1em'
   },
   DAI: {
     color: '#ffce45 !important'
@@ -66,7 +62,8 @@ export default function SettingsModal ({
 
         <div className={classes.spacer}>
           <Button
-            component='a' href={getEtherscanLink(context.networkId, 'transaction', creationTransactionHash)} target='_blank'
+            component='a'
+            href={getEtherscanLink(context.networkId, 'transaction', creationTransactionHash)} target='_blank'
             color='secondary' variant='contained'
           >
             View Creation Transaction
@@ -76,6 +73,7 @@ export default function SettingsModal ({
         <div className={classes.spacer}>
           <Button color='secondary' variant='contained' onClick={resetDemo}>Reset Demo</Button>
         </div>
+
       </div>
     </Dialog>
   )

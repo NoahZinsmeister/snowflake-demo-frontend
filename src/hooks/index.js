@@ -1,6 +1,7 @@
 import { useState, useReducer, useCallback, useEffect, useMemo } from 'react'
-import { ethers } from 'ethers'
+import { ethers, utils } from 'ethers'
 import { useWeb3Context } from 'web3-react'
+import EthCrypto from 'eth-crypto'
 
 import contracts from '../contracts'
 
@@ -113,4 +114,68 @@ export function useBlockValue(fetchFunction, depends) {
   }, depends)
 
   return value
+}
+
+export function useEINDetails(ein) {
+  const snowMoResolver = useContract("SnowMoResolver")
+  const _1484 = useContract("1484")
+  const snowflakeAddress = useContractAddress("Snowflake")
+  const demoHelperAddress = useContractAddress("DemoHelper")
+  const context = useWeb3Context()
+
+  const [address, setAddress] = useState()
+  const [publicKey, setPublicKey] = useState()
+
+  // set recipient address from EIN
+  useEffect(() => {
+    setPublicKey()
+    if (ein) {
+      _1484.functions.getIdentity(ein)
+        .then(i => {
+          const recoveredAddress = i.associatedAddresses[0]
+          setAddress(recoveredAddress)
+          fetchPublicKey(ein, recoveredAddress)
+        })
+        .catch(() => {
+          setAddress()
+        })
+    } else {
+      setAddress()
+    }
+  }, [ein])
+
+  function fetchPublicKey(ein, address) {
+    const filter = snowMoResolver.filters['SnowMoSignup'](Number(ein))
+    filter.fromBlock = 3749195
+    context.library.getLogs(filter)
+      .then(log => {
+        if (log && log[0] && log[0].transactionHash) {
+          context.library.getTransaction(log[0].transactionHash)
+            .then(receipt => {
+              // decoded args from snow-mo signup
+              const decoded = utils.defaultAbiCoder.decode(
+                ['address', 'address', 'uint8', 'bytes32', 'bytes32', 'uint256'], `0x${receipt.data.substring(10)}`
+              )
+              const signature = `${decoded[3]}${decoded[4].substring(2)}${decoded[2] === 27 ? '1b' : '1c'}`
+              const hash = utils.solidityKeccak256(
+                ['bytes1', 'bytes1', 'address', 'string', 'address', 'address', 'address[]', 'address[]', 'uint256'],
+                [
+                  '0x19', '0x00', _1484.address, 'I authorize the creation of an Identity on my behalf.',
+                  address, address, [snowflakeAddress, demoHelperAddress], [], decoded[5]
+                ]
+              )
+
+              const prefixedHash = utils.solidityKeccak256(
+                ['string', 'bytes32'],
+                ['\x19Ethereum Signed Message:\n32', hash]
+              )
+
+              const publicKey = EthCrypto.recoverPublicKey(signature, prefixedHash)
+              setPublicKey(publicKey)
+            })
+        }
+      })
+  }
+
+  return { address, publicKey }
 }

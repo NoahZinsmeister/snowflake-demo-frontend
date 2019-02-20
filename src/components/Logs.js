@@ -5,10 +5,22 @@ import MUIDataTable from "mui-datatables";
 import { makeStyles } from '@material-ui/styles';
 import { utils } from 'ethers'
 import moment from 'moment'
+import { createMuiTheme, MuiThemeProvider } from '@material-ui/core/styles';
 
 import { getEtherscanLink } from '../utilities'
 import { ReactComponent as DaiLogo } from '../assets/dai.svg'
 import { ReactComponent as HydroLogo } from '../assets/hydro.svg'
+
+const theme = createMuiTheme({
+  typography: { useNextVariants: true },
+  overrides: {
+    MuiPaper: {
+      root: {
+        display: 'grid'
+      }
+    }
+  }
+})
 
 const columns = [
   {
@@ -33,6 +45,7 @@ const columns = [
     }
   },
   'Amount',
+  'Message',
   {
     name: 'Time',
     options: {
@@ -126,6 +139,7 @@ export default function Logs ({ logs, logNames }) {
         identityTo,
         isDai ? 'DAI' : 'HYDRO',
         isDai ? daiAmount : Math.round(Number(utils.formatUnits(log.decoded.amount, 18))),
+        log.decodedMessage || '',
         log.timestamp,
         log.transactionHash
       ]
@@ -133,6 +147,7 @@ export default function Logs ({ logs, logNames }) {
 
     return (
       <MUIDataTable
+        MUIDataTable
         title="Transfer History"
         data={data}
         columns={columns}
@@ -143,7 +158,9 @@ export default function Logs ({ logs, logNames }) {
 
   return (
     <div className={classes.title}>
-      {getTable()}
+      <MuiThemeProvider theme={theme}>
+        {getTable()}
+      </MuiThemeProvider>
     </div>
   )
 }
