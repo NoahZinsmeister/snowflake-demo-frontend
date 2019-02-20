@@ -11,11 +11,12 @@ import SettingsIcon from '@material-ui/icons/Settings';
 import { makeStyles } from '@material-ui/styles';
 import { useWeb3Context } from 'web3-react'
 import { utils } from 'ethers'
-import EthCrypto from 'eth-crypto'
+
 
 import { ReactComponent as Spinner } from '../assets/spinner.svg'
+import { getEINDetails } from '../utilities'
 import { useContract, useBlockValue } from '../hooks'
-import { getEtherscanLink } from '../utilities'
+import { getEtherscanLink, decryptMessage } from '../utilities'
 import SettingsModal from '../components/SettingsModal'
 import Header from '../components/Header'
 import SendTo from '../components/SendTo'
@@ -133,17 +134,21 @@ export default function Home ({
     if (log.decoded.einFrom) {
       if (log.decoded.einFrom.toNumber() === ein) {
         log.transferType = 'Sent'
-        if (log.decoded.message !== '') {
-          log.decodedMessage = '<Encrypted>'
-        }
       } else {
         log.transferType = 'Received'
-        if (log.decoded.message !== '') {
-          const decompressed = EthCrypto.hex.decompress(log.decoded.message, true)
-          const parsed = EthCrypto.cipher.parse(decompressed.substring(2))
-          const decrypted = await EthCrypto.decryptWithPrivateKey(wallet.privateKey, parsed)
-          log.decodedMessage = decrypted
+      }
+
+      const otherEIN = log.transferType === 'Sent' ? log.decoded.einTo : log.decoded.einFrom
+
+      if (log.decoded.message !== '') {
+        try {
+          const { publicKey } = await getEINDetails(context.library, otherEIN)
+          log.decodedMessage = decryptMessage(log.decoded.message, wallet.privateKey, publicKey)
+        } catch (error) {
+          console.error('Unable to decrypt data.')
         }
+      } else {
+        log.decodedMessage = ''
       }
     }
 

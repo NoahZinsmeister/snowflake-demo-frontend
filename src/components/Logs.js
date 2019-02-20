@@ -18,6 +18,11 @@ const theme = createMuiTheme({
       root: {
         display: 'grid'
       }
+    },
+    MuiTableCell: {
+      root: {
+        overflowX: 'auto'
+      }
     }
   }
 })

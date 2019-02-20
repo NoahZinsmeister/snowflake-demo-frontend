@@ -26,6 +26,7 @@ const useStyles = makeStyles({
     justifyContent: 'center'
   },
   couch: {
+    maxWidth: '30em',
     width: '80%',
     filter: 'brightness(175%)',
     userSelect: 'none'

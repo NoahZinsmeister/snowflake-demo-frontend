@@ -6,10 +6,10 @@ import InputAdornment from '@material-ui/core/InputAdornment'
 import AccountCircle from '@material-ui/icons/AccountCircle'
 import { makeStyles } from '@material-ui/styles';
 import { ethers } from 'ethers'
-import EthCrypto from 'eth-crypto'
 
 import TransactionController from './TransactionController'
 import { useContract, useEINDetails } from '../hooks'
+import { encryptMessage } from '../utilities'
 
 const useStyles = makeStyles({
   inputWrapper: {
@@ -51,31 +51,19 @@ export default function SendTo ({
   )
 
   const [plaintextMessage, setPlaintextMessage] = useState('')
-  const [cipertextMessage, setCipertextMessage] = useState('')
+  const [plaintextMessageError, setPlaintextMessageError] = useState(false)
 
   const canSend = (
     !currentTransactionHash && 
     recipientEIN.error === null && recipientAmount.error === null &&
     recipientEIN.value !== '' && recipientAmount.value !== '' &&
-    Number(recipientEIN.value) !== ein &&
-    (plaintextMessage === '' || cipertextMessage !== '')
+    !!(plaintextMessage === '' || !plaintextMessageError)
   )
 
   const snowMoResolver = useContract("SnowMoResolver")
   const snowflake = useContract("Snowflake")
 
   const identiconRef = useRef()
-
-  // make cipherText
-  useEffect(() => {
-    if (recipientPublicKey && plaintextMessage !== '') {
-      EthCrypto.encryptWithPublicKey(recipientPublicKey, plaintextMessage)
-        .then(encrypted => {
-          const stringified = EthCrypto.cipher.stringify(encrypted)
-          setCipertextMessage(EthCrypto.hex.compress(stringified, true))
-        })
-    }
-  }, [plaintextMessage, recipientPublicKey])
 
   // set the recipient EIN identicon ref
   useEffect(() => {
@@ -95,7 +83,7 @@ export default function SendTo ({
   // ensure that when the maxEIN updates, the recipientEIN is re-validated
   useEffect(() => {
     validateCurrentRecipientEIN()
-  }, [maxEIN])
+  }, [maxEIN, recipientEIN.value])
 
   // ensure that when the snowflakeBalance updates, the recipientAmount is re-validated
   useEffect(() => {
@@ -109,6 +97,8 @@ export default function SendTo ({
   function resetForm () {
     setRecipientEIN({ value: '', error: null })
     setRecipientAmount({ value: '', error: null })
+    setPlaintextMessageError(false)
+    setPlaintextMessage('')
   }
 
   async function getSignedPermission (transactionBytes) {
@@ -131,9 +121,15 @@ export default function SendTo ({
     const functionSelector = ethers.utils.hexDataSlice(
       ethers.utils.id('sendTo(uint256,uint256,uint256,string)'), 0, 4
     )
+
+    const ciphertext = plaintextMessage === '' ? '' : encryptMessage(plaintextMessage, wallet.privateKey, recipientPublicKey)
+
     const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
       ['uint256', 'uint256', 'uint256', 'string'],
-      [ein, recipientEIN.value, ethers.utils.parseUnits(recipientAmount.value, 18), cipertextMessage]
+      [
+        ein, recipientEIN.value, ethers.utils.parseUnits(recipientAmount.value, 18),
+        ciphertext
+      ]
     )
     const transactionBytes = `${functionSelector}${abiEncodedArguments.substring(2)}`
 
@@ -151,6 +147,8 @@ export default function SendTo ({
   function validateCurrentRecipientEIN () {
     if (recipientEIN.value >= maxEIN)
       setRecipientEIN({ ...recipientEIN, error: 'Please specify a valid EIN.'})
+    if (Number(recipientEIN.value) === Number(ein))
+      setRecipientEIN({ ...recipientEIN, error: 'Cannot send to your own EIN.' })
   }
 
   function updateRecipientEIN (event) {
@@ -173,15 +171,24 @@ export default function SendTo ({
     }
   }
 
-  const plaintextMessageError = !!(plaintextMessage && recipientEIN.value && !(!!recipientPublicKey))
+  useEffect(() => {
+    if (identiconRef.current && !recipientEIN.value)
+      identiconRef.current.innerHTML = ''
+  }, [recipientEIN.value])
+
+  useEffect(() => {
+    setPlaintextMessageError(false)
+    setPlaintextMessage('')
+  }, [recipientEIN.value])
 
   function updatePlaintextMessage (event) {
-    if (!plaintextMessageError) {
+    if (recipientPublicKey) {
+      setPlaintextMessageError(false)
       setPlaintextMessage(event.target.value)
+    } else {
+      setPlaintextMessageError(true)
     }
   }
-  
-  
 
   return (
     <>
@@ -281,7 +288,7 @@ export default function SendTo ({
                     onChange={updateRecipientAmount}
                   />
                   <TextField
-                    disabled={transactionState !== 'unsent'}
+                    disabled={transactionState !== 'unsent' || plaintextMessageError}
                     className={classes.input}
                     label="Secret Message"
                     helperText={!plaintextMessageError ? "An optional message that can only be read by the recipient." : 'Cannot send secret messages to this EIN.'}

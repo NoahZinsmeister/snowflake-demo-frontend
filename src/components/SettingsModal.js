@@ -9,7 +9,6 @@ import { CopyToClipboard } from 'react-copy-to-clipboard'
 
 import { getEtherscanLink } from '../utilities'
 
-
 const useStyles = makeStyles({
   centered: {
     display: 'flex',
@@ -19,7 +18,8 @@ const useStyles = makeStyles({
     overflowY: 'scroll',
   },
   spacer: {
-    marginBottom: '1em'
+    marginBottom: '1em',
+    textAlign: 'center'
   },
   DAI: {
     color: '#ffce45 !important'
