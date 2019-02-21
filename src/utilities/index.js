@@ -95,38 +95,36 @@ export function getContractAddress(contractName) {
   return contracts[contractName].address
 }
 
-export async function getEINAddress(library, ein) {
-  const _1484 = getContract(library, "1484")
-
-  const address = await _1484.functions.getIdentity(ein)
-    .then(i => i.associatedAddresses[0])
-
-  return address
-}
-
-export async function getEINDetails(library, ein, manualAddress) {
+export async function getEINDetails(library, ein) {
   const snowMoResolver = getContract(library, "SnowMoResolver")
   const _1484 = getContract(library, "1484")
   const snowflakeAddress = getContractAddress("Snowflake")
   const demoHelperAddress = getContractAddress("DemoHelper")
 
-  const address = await (
-    manualAddress
-      ? manualAddress
-      : getEINAddress(library, ein)
-  )
-
-  const filter = snowMoResolver.filters['SnowMoSignup'](Number(ein))
-  filter.fromBlock = 3749195
-
-  const log = await library.getLogs(filter)
-
-  if (!(log && log[0] && log[0].transactionHash)) {
-    throw Error('Cannot fetch details')
+  async function getAddress() {
+    return await _1484.functions.getIdentity(ein)
+      .then(i => i.associatedAddresses[0])
   }
 
-  const publicKey = await library.getTransaction(log[0].transactionHash)
-    .then(async receipt => {
+  async function getSnowMoSignupReceipt() {
+    const filter = snowMoResolver.filters['SnowMoSignup'](Number(ein))
+    filter.fromBlock = 3749195
+
+    const log = await library.getLogs(filter)
+
+    if (!(log && log[0] && log[0].transactionHash)) {
+      return null
+    }
+
+    return await library.getTransaction(log[0].transactionHash)
+  }
+
+  const { address, publicKey } = await Promise.all([getAddress(), getSnowMoSignupReceipt()])
+    .then(async ([address, receipt]) => {
+      if (receipt === null) {
+        return { address, publicKey: null }
+      }
+
       // decoded args from snow-mo signup
       const decoded = utils.defaultAbiCoder.decode(
         ['address', 'address', 'uint8', 'bytes32', 'bytes32', 'uint256'], `0x${receipt.data.substring(10)}`
@@ -146,7 +144,7 @@ export async function getEINDetails(library, ein, manualAddress) {
       )
 
       const publicKey = await EthCrypto.recoverPublicKey(signature, prefixedHash)
-      return `04${publicKey}`
+      return { address, publicKey: `04${publicKey}` }
     })
 
   return { address, publicKey }

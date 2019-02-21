@@ -8,7 +8,7 @@ import { makeStyles } from '@material-ui/styles';
 import { ethers } from 'ethers'
 
 import TransactionController from './TransactionController'
-import { useContract, useEINDetails } from '../hooks'
+import { useContract, useEINDetails, useDebounced } from '../hooks'
 import { encryptMessage } from '../utilities'
 
 const useStyles = makeStyles({
@@ -43,29 +43,26 @@ export default function SendTo ({
   currentTransactionHash, setCurrentTransactionHash
 }) {
   const classes = useStyles()
-  const [recipientEIN, setRecipientEIN] = useState({value: '', error: null})
-  const [recipientAmount, setRecipientAmount] = useState({value: '', error: null})
-
-  const { address: recipientEINAddress, publicKey: recipientPublicKey } = useEINDetails(
-    recipientEIN.error ? undefined : recipientEIN.value
-  )
-
-  const [plaintextMessage, setPlaintextMessage] = useState('')
-  const [plaintextMessageError, setPlaintextMessageError] = useState(false)
-
-  const canSend = (
-    !currentTransactionHash && 
-    recipientEIN.error === null && recipientAmount.error === null &&
-    recipientEIN.value !== '' && recipientAmount.value !== '' &&
-    !!(plaintextMessage === '' || !plaintextMessageError)
-  )
 
   const snowMoResolver = useContract("SnowMoResolver")
   const snowflake = useContract("Snowflake")
 
-  const identiconRef = useRef()
+  const [recipientEIN, setRecipientEIN] = useState({value: '', error: null})
+  const debouncedEIN = useDebounced(recipientEIN.error ? undefined : recipientEIN.value, 200)
+  const [recipientAmount, setRecipientAmount] = useState({value: '', error: null})
+  const [plaintextMessage, setPlaintextMessage] = useState({value: '', error: null})
+
+  const { address: recipientEINAddress, publicKey: recipientPublicKey } = useEINDetails(debouncedEIN)
+
+  const canSend = (
+    !currentTransactionHash && 
+    recipientEIN.error === null && recipientAmount.error === null &&
+    debouncedEIN !== '' && recipientAmount.value !== '' &&
+    !!(plaintextMessage.value === '' || plaintextMessage.error === null)
+  )
 
   // set the recipient EIN identicon ref
+  const identiconRef = useRef()
   useEffect(() => {
     if (identiconRef.current) {
       if (recipientEINAddress) {
@@ -78,17 +75,7 @@ export default function SendTo ({
         identiconRef.current.innerHTML = ''
       }
     }
-  }, [recipientEINAddress])  
-
-  // ensure that when the maxEIN updates, the recipientEIN is re-validated
-  useEffect(() => {
-    validateCurrentRecipientEIN()
-  }, [maxEIN, recipientEIN.value])
-
-  // ensure that when the snowflakeBalance updates, the recipientAmount is re-validated
-  useEffect(() => {
-    validateCurrentRecipientAmount()
-  }, [snowflakeBalance])
+  }, [recipientEINAddress, identiconRef.current])
 
   function addTransactionHash(transactionHash) {
     setCurrentTransactionHash(transactionHash)
@@ -97,8 +84,7 @@ export default function SendTo ({
   function resetForm () {
     setRecipientEIN({ value: '', error: null })
     setRecipientAmount({ value: '', error: null })
-    setPlaintextMessageError(false)
-    setPlaintextMessage('')
+    setPlaintextMessage({ value: '', error: null })
   }
 
   async function getSignedPermission (transactionBytes) {
@@ -122,7 +108,9 @@ export default function SendTo ({
       ethers.utils.id('sendTo(uint256,uint256,uint256,string)'), 0, 4
     )
 
-    const ciphertext = plaintextMessage === '' ? '' : encryptMessage(plaintextMessage, wallet.privateKey, recipientPublicKey)
+    const ciphertext = plaintextMessage.value === ''
+      ? ''
+      : encryptMessage(plaintextMessage.value, wallet.privateKey, recipientPublicKey)
 
     const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
       ['uint256', 'uint256', 'uint256', 'string'],
@@ -144,6 +132,11 @@ export default function SendTo ({
     return { to, transactionData }
   }
 
+  // ensure that when the maxEIN updates, the recipientEIN is re-validated
+  useEffect(() => {
+    validateCurrentRecipientEIN()
+  }, [maxEIN, debouncedEIN])
+
   function validateCurrentRecipientEIN () {
     if (recipientEIN.value >= maxEIN)
       setRecipientEIN({ ...recipientEIN, error: 'Please specify a valid EIN.'})
@@ -158,6 +151,11 @@ export default function SendTo ({
     }
   }
 
+  // ensure that when the snowflakeBalance updates, the recipientAmount is re-validated
+  useEffect(() => {
+    validateCurrentRecipientAmount()
+  }, [snowflakeBalance])
+
   function validateCurrentRecipientAmount () {
     if (recipientAmount.value >= snowflakeBalance)
       setRecipientAmount({ ...recipientEIN, error: 'Cannot send more than your current balance.'})
@@ -170,23 +168,26 @@ export default function SendTo ({
       setRecipientAmount({ value: event.target.value, error: errorMessage })
     }
   }
-
+  
   useEffect(() => {
-    if (identiconRef.current && !recipientEIN.value)
-      identiconRef.current.innerHTML = ''
-  }, [recipientEIN.value])
-
-  useEffect(() => {
-    setPlaintextMessageError(false)
-    setPlaintextMessage('')
-  }, [recipientEIN.value])
+    if (debouncedEIN && recipientEINAddress && recipientPublicKey === null) {
+      setPlaintextMessage({ value: '', error: 'Cannot send secret messages to this EIN.' })
+    } else {
+      setPlaintextMessage({ value: '', error: null })
+    }
+  }, [debouncedEIN, recipientEINAddress, recipientPublicKey])
 
   function updatePlaintextMessage (event) {
-    if (recipientPublicKey) {
-      setPlaintextMessageError(false)
-      setPlaintextMessage(event.target.value)
-    } else {
-      setPlaintextMessageError(true)
+    if (recipientPublicKey && event.target.value.length <= 200) {
+      setPlaintextMessage({ value: event.target.value, error: null })      
+    }
+
+    if (!recipientPublicKey) {
+      setPlaintextMessage({ value: '', error: 'Cannot send secret messages to this EIN.' })
+    }
+
+    if (event.target.value.length > 200) {
+      setPlaintextMessage(state => ({ value: state.value, error: 'Message length exceeded.' }))
     }
   }
 
@@ -288,12 +289,18 @@ export default function SendTo ({
                     onChange={updateRecipientAmount}
                   />
                   <TextField
-                    disabled={transactionState !== 'unsent' || plaintextMessageError}
+                    disabled={transactionState !== 'unsent' || plaintextMessage.error !== null || !recipientPublicKey}
                     className={classes.input}
                     label="Secret Message"
-                    helperText={!plaintextMessageError ? "An optional message that can only be read by the recipient." : 'Cannot send secret messages to this EIN.'}
-                    error={plaintextMessageError}
-                    value={plaintextMessage}
+                    helperText={plaintextMessage.error === null
+                      ? "An optional message that can only be read by the recipient."
+                      : plaintextMessage.error
+                    }
+                    error={
+                      plaintextMessage.error !== null &&
+                      plaintextMessage.error !== 'Cannot send secret messages to this EIN.'
+                    }
+                    value={plaintextMessage.value}
                     onChange={updatePlaintextMessage}
                   />
                   <div className={classes.button}>

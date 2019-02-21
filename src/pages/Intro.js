@@ -2,17 +2,25 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import Typography from '@material-ui/core/Typography';
 import Fab from '@material-ui/core/Fab';
+import Button from '@material-ui/core/Button';
 import { makeStyles } from '@material-ui/styles';
 
-const useStyles = makeStyles({
+const useStyles = makeStyles(theme => ({
   noDecoration: {
     color: 'inherit'
   },
   centered: {
     display: 'flex',
-    justifyContent: 'center'
+    alignItems: 'center',
+    flexDirection: 'column'
+  },
+  recover: {
+    marginTop: '2em !important',
+    marginBottom: '-1em !important',
+    fontSize: '.7em !important',
+    color: `${theme.palette.grey[700]} !important`
   }
-})
+}))
 
 export default function Intro () {
   const classes = useStyles()
@@ -42,6 +50,11 @@ export default function Intro () {
         >
           Begin
         </Fab>
+        <Button
+          className={classes.recover} component={Link} to='/recover' size="small"
+        >
+          Recover?
+        </Button>
       </div>
     </>
   )

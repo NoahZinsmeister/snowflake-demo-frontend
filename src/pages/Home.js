@@ -12,7 +12,6 @@ import { makeStyles } from '@material-ui/styles';
 import { useWeb3Context } from 'web3-react'
 import { utils } from 'ethers'
 
-
 import { ReactComponent as Spinner } from '../assets/spinner.svg'
 import { getEINDetails } from '../utilities'
 import { useContract, useBlockValue } from '../hooks'
@@ -260,7 +259,7 @@ export default function Home ({
 
         <Tabs
           value={isWallet}
-          onChange={() => setIsWallet(v => v === 0 ? 1 : 0)}
+          onChange={(event, value) => setIsWallet(value)}
           variant='fullWidth'
           centered
           indicatorColor="secondary"

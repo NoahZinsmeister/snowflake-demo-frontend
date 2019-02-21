@@ -2,7 +2,7 @@ import { useState, useReducer, useCallback, useEffect, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3Context } from 'web3-react'
 
-import { getContract, getContractAddress, getEINAddress, getEINDetails } from '../utilities'
+import { getContract, getContractAddress, getEINDetails } from '../utilities'
 
 function localStorageReducer(state, action) {
   switch (action.type) {
@@ -94,6 +94,17 @@ export function useContractAddress(contractName) {
   return useMemo(() => getContractAddress(contractName), [contractName])
 }
 
+export function useDebounced(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(handler)
+  }, [value, delay])
+
+  return debouncedValue
+}
+
 export function useBlockValue(fetchFunction, depends) {
   const context = useWeb3Context()
   const [value, setValue] = useState()
@@ -118,33 +129,20 @@ export function useBlockValue(fetchFunction, depends) {
 export function useEINDetails(ein) {
   const context = useWeb3Context()
 
-  const [address, setAddress] = useState()
-  const [publicKey, setPublicKey] = useState()
+  const defaultState = { address: undefined, publicKey: undefined }
+  const [details, setDetails] = useState(defaultState)
 
   // set recipient address from EIN
   useEffect(() => {
-    setPublicKey()
     if (ein) {
-      getEINAddress(context.library, ein)
-        .then(address => {
-          setAddress(address)
-          fetchPublicKey(ein, address)
+      getEINDetails(context.library, ein)
+        .then(({ address, publicKey }) => {
+          setDetails({ address, publicKey })
         })
-        .catch(() => {
-          setAddress()
-        })
+    } else {
+      setDetails(defaultState)
     }
   }, [ein])
 
-  function fetchPublicKey(ein, address) {
-    getEINDetails(context.library, ein, address)
-      .then(({ publicKey }) => {
-        setPublicKey(publicKey)
-      })
-      .catch(() => {
-        setPublicKey()
-      })
-  }
-
-  return { address, publicKey }
+  return { ...details }
 }

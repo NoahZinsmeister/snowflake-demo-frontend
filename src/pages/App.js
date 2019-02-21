@@ -8,6 +8,7 @@ import { ThemeProvider } from "@material-ui/styles";
 import { useEIN, useWallet, useLocalStorageObject } from '../hooks'
 import Splash from '../components/Splash'
 import Intro from './Intro'
+import Recover from './Recover'
 import Home from './Home'
 import Onboarding from './Onboarding'
 
@@ -133,7 +134,10 @@ function Initializer () {
           }}
         />
         <Route path="/wallet"
-          render={() => {
+          render={({ location }) => {
+            const { fromRecovery } = location.state || {}
+
+            if (fromRecovery && !ein) return null
             if (!(wallet && ein && stepCompleted === 2)) return <Redirect to='/' />
             else return (
               <Home
@@ -161,6 +165,18 @@ function Initializer () {
                 resetDemo={resetDemo}
                 tab='store'
               />
+            )
+          }}
+        />
+        <Route
+          path="/recover"
+          render={() => {
+            if (privateKey) return <Redirect to={{ pathname: '/wallet', state: { fromRecovery: true } }} />
+
+            return (
+              <Splash>
+                <Recover setPrivateKeyAndCreationTransactionHash={setPrivateKeyAndCreationTransactionHash} />
+              </Splash>
             )
           }}
         />
