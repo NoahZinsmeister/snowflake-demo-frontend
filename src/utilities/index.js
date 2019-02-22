@@ -1,5 +1,6 @@
 import EthCrypto from 'eth-crypto'
 import { ethers, utils } from 'ethers'
+import scrypt from 'scrypt-js'
 
 import contracts from '../contracts'
 
@@ -38,16 +39,28 @@ export function getEtherscanLink(networkId, type, data) {
   return `https://${prefix}etherscan.io/${path}/${data}`
 }
 
-function getSharedSecret(privateKey, publicKey) {
+async function getSharedSecret(privateKey, publicKey) {
   const sec = crypto.createECDH('secp256k1')
   sec.setPrivateKey(privateKey.substring(2), 'hex')
   const secret = sec.computeSecret(publicKey, 'hex')
-  return secret
+
+  const N = 16384, r = 8, p = 1, dkLen = 32
+  return await new Promise((resolve, reject) => {
+    scrypt(secret, Buffer.from('801a2bbb220c4bdc8563c32ca60fb79a', 'hex'), N, r, p, dkLen, (error, _, key) => {
+      if (error) {
+        reject(error)
+      }
+
+      if (key) {
+        resolve(new Uint8Array(key))
+      }
+    })
+  })
 }
 
-function getCipher(privateKey, publicKey) {
+async function getCipher(privateKey, publicKey) {
   const algorithm = 'aes-256-cbc'
-  const secret = getSharedSecret(privateKey, publicKey)
+  const secret = await getSharedSecret(privateKey, publicKey)
   const iv = crypto.randomBytes(16)
 
   const cipher = crypto.createCipheriv(algorithm, secret, iv)
@@ -55,15 +68,15 @@ function getCipher(privateKey, publicKey) {
   return { cipher, iv }
 }
 
-function getDecipher(privateKey, publicKey, iv) {
+async function getDecipher(privateKey, publicKey, iv) {
   const algorithm = 'aes-256-cbc'
-  const secret = getSharedSecret(privateKey, publicKey)
+  const secret = await getSharedSecret(privateKey, publicKey)
   const decipher = crypto.createDecipheriv(algorithm, secret, iv)
   return decipher
 }
 
-export function encryptMessage(plaintext, privateKey, publicKey) {
-  const { cipher, iv } = getCipher(privateKey, publicKey)
+export async function encryptMessage(plaintext, privateKey, publicKey) {
+  const { cipher, iv } = await getCipher(privateKey, publicKey)
   let encrypted = cipher.update(plaintext, 'utf8', 'hex')
   encrypted += cipher.final('hex')
 
@@ -72,14 +85,14 @@ export function encryptMessage(plaintext, privateKey, publicKey) {
   return EthCrypto.hex.compress(concatenated, true)
 }
 
-export function decryptMessage(compressedCiphertext, privateKey, publicKey) {
+export async function decryptMessage(compressedCiphertext, privateKey, publicKey) {
   // decipher compressedCiphertext
   const decompressed = EthCrypto.hex.decompress(compressedCiphertext, true).substring(2)
   const ciphertext = decompressed.substring(0, decompressed.length - 32)
   const iv = Buffer.from(decompressed.substring(decompressed.length - 32), 'hex')
 
   // get decipherer
-  const decipher = getDecipher(privateKey, publicKey, iv)
+  const decipher = await getDecipher(privateKey, publicKey, iv)
 
   let decrypted = decipher.update(ciphertext, 'hex', 'utf8')
   decrypted += decipher.final('utf8')

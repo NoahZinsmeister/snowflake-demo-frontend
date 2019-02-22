@@ -108,9 +108,10 @@ export default function SendTo ({
       ethers.utils.id('sendTo(uint256,uint256,uint256,string)'), 0, 4
     )
 
-    const ciphertext = plaintextMessage.value === ''
+    const ciphertext = await (plaintextMessage.value === ''
       ? ''
       : encryptMessage(plaintextMessage.value, wallet.privateKey, recipientPublicKey)
+    )
 
     const abiEncodedArguments = ethers.utils.defaultAbiCoder.encode(
       ['uint256', 'uint256', 'uint256', 'string'],

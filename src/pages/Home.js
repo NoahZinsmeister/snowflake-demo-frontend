@@ -142,9 +142,9 @@ export default function Home ({
       if (log.decoded.message !== '') {
         try {
           const { publicKey } = await getEINDetails(context.library, otherEIN)
-          log.decodedMessage = decryptMessage(log.decoded.message, wallet.privateKey, publicKey)
+          log.decodedMessage = await decryptMessage(log.decoded.message, wallet.privateKey, publicKey)
         } catch (error) {
-          console.error('Unable to decrypt data.')
+          log.decodedMessage = '<Decoding Error>'
         }
       } else {
         log.decodedMessage = ''
@@ -226,7 +226,7 @@ export default function Home ({
   const [showSpinner, setShowSpinner] = useState(false)
   useEffect(() => {
     if (!snowflakeBalance || true) {
-      const timeout = setTimeout(() => setShowSpinner(true), 500)
+      const timeout = setTimeout(() => setShowSpinner(true), 250)
       return () => clearTimeout(timeout)
     }
   }, [snowflakeBalance])

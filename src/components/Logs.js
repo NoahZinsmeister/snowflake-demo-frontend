@@ -1,11 +1,11 @@
 import React from 'react'
-import Typography from '@material-ui/core/Typography';
 import Chip from '@material-ui/core/Chip';
 import MUIDataTable from "mui-datatables";
 import { makeStyles } from '@material-ui/styles';
 import { utils } from 'ethers'
 import moment from 'moment'
 import { createMuiTheme, MuiThemeProvider } from '@material-ui/core/styles';
+import { ReactComponent as Spinner } from '../assets/spinner.svg'
 
 import { getEtherscanLink } from '../utilities'
 import { ReactComponent as DaiLogo } from '../assets/dai.svg'
@@ -95,7 +95,14 @@ const options = {
 const useStyles = makeStyles({
   title: {
     marginTop: '2em'
-  }
+  },
+  spinner: {
+    fill: theme.palette.secondary.main
+  },
+  spinnerWrapper: {
+    display: 'flex',
+    justifyContent: 'center'
+  }  
 })
 
 
@@ -106,9 +113,9 @@ export default function Logs ({ logs, logNames }) {
 
   function getTable () {
     if (!allLogsLoaded) return (
-      <Typography variant='body1' align='center' paragraph={true}>
-        Loading...
-      </Typography>
+      <div className={classes.spinnerWrapper}>
+        <Spinner className={classes.spinner} />
+      </div>
     )
 
     const validTransferFromLogs = logs.TransferFrom.filter(l => !l.removed)

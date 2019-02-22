@@ -21,7 +21,6 @@ const useStyles = makeStyles({
   flexed: {
     display: 'flex',
     flex: '1 1 auto',
-    margin: '1em !important',
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -40,7 +39,7 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
+    flexDirection: 'column',
     flexWrap: 'wrap'    
   },
   title: {
