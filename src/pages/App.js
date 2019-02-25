@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Switch, Route, Redirect } from 'react-router-d
 import { ethers } from 'ethers'
 import { createMuiTheme } from "@material-ui/core/styles";
 import { ThemeProvider } from "@material-ui/styles";
+import Typography from '@material-ui/core/Typography';
 
 import { useEIN, useWallet, useLocalStorageObject } from '../hooks'
 import Splash from '../components/Splash'
@@ -95,6 +96,14 @@ function Initializer () {
   return (
     <Router basename={process.env.PUBLIC_URL}>
       <Switch>
+        <Route path = '*' render={() => {
+          return (
+            <Splash>
+              <Typography>SnowMo is currently undergoing maintenance, please check back soon!</Typography>
+            </Splash>
+          )
+        }}>
+        </Route>
         <Route
           exact
           path="/"
