@@ -130,7 +130,11 @@ export default function Home ({
       variables={{ ein }}
     >
       {({ data, error, loading }) => {
-        // if (error) console.error(error)
+        if (error) {
+          console.error(error)
+          return null
+        }
+
         if (!snowflakeBalance || loading || error)
           return (
             <div className={classes.spinnerWrapper}>
@@ -153,7 +157,7 @@ export default function Home ({
 
             <SettingsModal
               wallet={wallet}
-              creationTransactionHash={/*data.snowMoEntities[0].transactionHash*/'0x72da266529f64010d4f2780e1ab3fe7b9aae2a2f3758465433056da3c75f426d'}
+              creationTransactionHash={data.snowMoEntities[0].transactionHash}
               resetDemo={resetDemo}
               open={settingsModalOpen} onClose={() => setSettingsModalOpen(false)}
             />

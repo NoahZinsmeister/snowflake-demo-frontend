@@ -14,7 +14,7 @@ import { ReactComponent as DaiLogo } from '../assets/dai.svg'
 import { ReactComponent as HydroLogo } from '../assets/hydro.svg'
 
 const LOGS_QUERY = gql`
-  query allLogs($ein: Int!) {
+  query allLogs($ein: BigInt!) {
     snowMoTransfersTo: snowMoTransfers(where: { einTo: $ein }) {
       einFrom
       einTo
@@ -159,6 +159,7 @@ export default function Logs ({ ein }) {
           )
 
         if (error) {
+          console.error(error)
           return null
         }
 
