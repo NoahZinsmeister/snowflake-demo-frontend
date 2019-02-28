@@ -1,4 +1,6 @@
 import React from 'react'
+import { gql } from 'apollo-boost'
+import { Query } from 'react-apollo'
 import Chip from '@material-ui/core/Chip';
 import MUIDataTable from "mui-datatables";
 import { makeStyles } from '@material-ui/styles';
@@ -10,6 +12,39 @@ import { ReactComponent as Spinner } from '../assets/spinner.svg'
 import { getEtherscanLink } from '../utilities'
 import { ReactComponent as DaiLogo } from '../assets/dai.svg'
 import { ReactComponent as HydroLogo } from '../assets/hydro.svg'
+
+const LOGS_QUERY = gql`
+  query allLogs($ein: Int!) {
+    snowMoTransfersTo: snowMoTransfers(where: { einTo: $ein }) {
+      einFrom
+      einTo
+      amount
+      message
+      transactionHash
+      blockNumber
+      timestamp
+    }
+    snowMoTransfersFrom: snowMoTransfers(where: { einFrom: $ein }) {
+      einFrom
+      einTo
+      amount
+      message
+      transactionHash
+      blockNumber
+      timestamp
+    }
+    snowMoWithdrawFromVias(where: { einFrom: $ein }) {
+      einFrom
+      to
+      via
+      amount
+      message
+      transactionHash
+      blockNumber
+      timestamp
+    }
+  }
+`
 
 const theme = createMuiTheme({
   typography: { useNextVariants: true },
@@ -107,72 +142,76 @@ const useStyles = makeStyles({
 
 
 // TODO investigate potentially unnecessary re-renders when logs are added by the .on event listener
-export default function Logs ({ logs, logNames }) {
+export default function Logs ({ ein }) {
   const classes = useStyles()
-  const allLogsLoaded = logNames.every(logName => logName in logs)
-
-  function getTable () {
-    if (!allLogsLoaded) return (
-      <div className={classes.spinnerWrapper}>
-        <Spinner className={classes.spinner} />
-      </div>
-    )
-
-    const validTransferFromLogs = logs.TransferFrom.filter(l => !l.removed)
-    const validWithdrawFromViaLogs = logs.WithdrawFromVia.filter(l => !l.removed)
-    const validLogs = validTransferFromLogs.concat(validWithdrawFromViaLogs)
-
-    validLogs.sort((a, b) => {
-      if (a.blockNumber > b.blockNumber) return 1
-      if (a.blockNumber < b.blockNumber) return -1
-
-      if (a.transactionIndex > b.transactionIndex) return -1
-      if (a.transactionIndex < b.transactionIndex) return 1
-
-      return 0
-    })
-
-    validLogs.reverse()
-
-    const data = validLogs.map((log, i) => {
-      const identityTo = log.identityTo
-        ? log.identityTo
-        : (
-            log.transferType === 'Sent'
-              ? ((log.decoded.einTo && log.decoded.einTo.toNumber()) || log.einTo.toNumber())
-              : log.decoded.einFrom.toNumber()
-          )
-
-      const daiAmount = log.daiAmount && Math.round(Number(utils.formatUnits(log.daiAmount, 18)))
-      const isDai = !!daiAmount
-
-      return [
-        log.transferType,
-        identityTo,
-        isDai ? 'DAI' : 'HYDRO',
-        isDai ? daiAmount : Math.round(Number(utils.formatUnits(log.decoded.amount, 18))),
-        log.decodedMessage || '',
-        log.timestamp,
-        log.transactionHash
-      ]
-    })
-
-    return (
-      <MUIDataTable
-        MUIDataTable
-        title="Transfer History"
-        data={data}
-        columns={columns}
-        options={options}
-      />
-    )
-  }
 
   return (
-    <div className={classes.title}>
-      <MuiThemeProvider theme={theme}>
-        {getTable()}
-      </MuiThemeProvider>
-    </div>
+    <Query
+      query={LOGS_QUERY}
+      variables={{ ein }}
+    >
+      {({ data, error, loading }) => {
+        if (loading)
+          return (
+            <div className={classes.spinnerWrapper}>
+              <Spinner className={classes.spinner} />
+            </div>
+          )
+
+        if (error) {
+          return null
+        }
+
+        const { snowMoTransfersFrom, snowMoTransfersTo, snowMoWithdrawFromVias } = data
+        const validLogs = snowMoTransfersFrom.concat(snowMoTransfersTo).concat(snowMoWithdrawFromVias)
+
+        validLogs.sort((a, b) => {
+          if (Number(a.blockNumber) > Number(b.blockNumber)) return 1
+          if (Number(a.blockNumber) < Number(b.blockNumber)) return -1
+
+          return 0
+        })
+
+        validLogs.reverse()
+
+        const parsedData = validLogs.map(log => {
+          const transferType = Number(log.einFrom) === ein ? 'Sent' : 'Received'
+          const otherIdentity = (log.to && log.via) ? 'Dai-llar General' : (
+            transferType === 'Sent' ? log.einTo : log.einFrom
+          )
+
+          // actually should be fetching from uniswap logs...
+          const daiAmount = otherIdentity === 'Dai-llar General' ? 1 : null
+          // actually should be decoding...
+          const message = log.message === '' ? '' : '<Decoding Error>'
+
+          const isDai = !!daiAmount
+
+          return [
+            transferType,
+            otherIdentity,
+            isDai ? 'DAI' : 'HYDRO',
+            isDai ? daiAmount : Math.round(Number(utils.formatUnits(log.amount, 18))),
+            message,
+            log.timestamp,
+            log.transactionHash
+          ]
+        })
+
+        return (
+          <div className={classes.title}>
+            <MuiThemeProvider theme={theme}>
+              <MUIDataTable
+                MUIDataTable
+                title="Transfer History"
+                data={parsedData}
+                columns={columns}
+                options={options}
+              />
+            </MuiThemeProvider>
+          </div>
+        )
+      }}
+    </Query>
   )
 }

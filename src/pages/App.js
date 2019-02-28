@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react'
 import Web3Provider, { Connectors, useWeb3Context } from 'web3-react'
+import ApolloClient, { InMemoryCache } from 'apollo-boost'
+import { ApolloProvider } from 'react-apollo'
 import { BrowserRouter as Router, Switch, Route, Redirect } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { createMuiTheme } from "@material-ui/core/styles";
 import { ThemeProvider } from "@material-ui/styles";
-import Typography from '@material-ui/core/Typography';
 
 import { useEIN, useWallet, useLocalStorageObject } from '../hooks'
 import Splash from '../components/Splash'
@@ -17,6 +18,17 @@ const infura = new Connectors.NetworkOnlyConnector({ providerURL: process.env.RE
 const connectors = { infura }
 
 const theme = createMuiTheme({ typography: { useNextVariants: true } });
+
+const graphQlEndpoint = (
+  `${process.env.NODE_ENV === 'production' ? 'https://api.thegraph.com' : 'http://localhost:8000'}` +
+  `${process.env.REACT_APP_GRAPHQL_ENDPOINT}`
+)
+
+const client = new ApolloClient({
+  uri: graphQlEndpoint,
+  cache: new InMemoryCache(),
+})
+
 
 const localStorageKey = "SnowMo"
 const localStorageKeys = [
@@ -96,14 +108,6 @@ function Initializer () {
   return (
     <Router basename={process.env.PUBLIC_URL}>
       <Switch>
-        <Route path = '*' render={() => {
-          return (
-            <Splash>
-              <Typography>SnowMo is currently undergoing maintenance, please check back soon!</Typography>
-            </Splash>
-          )
-        }}>
-        </Route>
         <Route
           exact
           path="/"
@@ -199,7 +203,9 @@ export default function App () {
   return (
     <Web3Provider connectors={connectors} libraryName="ethers.js">
       <ThemeProvider theme={theme}>
-        <Initializer />
+        <ApolloProvider client={client}>
+          <Initializer />
+        </ApolloProvider>
       </ThemeProvider>
     </Web3Provider>
   )
