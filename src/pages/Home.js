@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { gql } from 'apollo-boost'
-import { Query } from 'react-apollo'
 import Snackbar from '@material-ui/core/Snackbar';
 import Button from '@material-ui/core/Button'
 import Tabs from '@material-ui/core/Tabs';
@@ -67,19 +65,6 @@ const useStyles = makeStyles(theme => ({
   }
 }))
 
-const LOGS_QUERY = gql`
-  query allLogs($ein: Int!) {
-    snowMoEntities(where: { ein: $ein }) {
-      transactionHash
-      blockNumber
-      timestamp
-    }
-    snowMoWithdrawFromVias(where: { einFrom: $ein }) {
-      id
-    }
-  }
-`
-
 export default function Home ({
   wallet, ein,
   creationTransactionHash,
@@ -124,100 +109,80 @@ export default function Home ({
     }
   }, [snowflakeBalance])
 
+  if (!snowflakeBalance)
+    return (
+      <div className={classes.spinnerWrapper}>
+        {showSpinner && <Spinner className={classes.spinner} />}
+      </div>
+    )
+
   return (
-    <Query
-      query={LOGS_QUERY}
-      variables={{ ein }}
-    >
-      {({ data, error, loading }) => {
-        if (error) {
-          console.error(error)
-          return null
-        }
+    <div className={classes.wrapper}>
+      <div className={classes.settingsWrapper}>
+        <IconButton className={classes.settingsIcon} onClick={() => setSettingsModalOpen(true)}>
+          <SettingsIcon />
+        </IconButton>
+      </div>
 
-        if (!snowflakeBalance || loading || error)
-          return (
-            <div className={classes.spinnerWrapper}>
-              {showSpinner && <Spinner className={classes.spinner} />}
-            </div>
-          )
+      <SettingsModal
+        wallet={wallet}
+        creationTransactionHash={creationTransactionHash}
+        resetDemo={resetDemo}
+        open={settingsModalOpen} onClose={() => setSettingsModalOpen(false)}
+      />
 
-        // if (!data.snowMoEntities[0]) {
-        //   // this clears wallets if we've migrated Snowflake/Resolver addresses
-        //   resetDemo()
-        // }
+      <Header
+        wallet={wallet} ein={ein}
+        snowflakeBalance={snowflakeBalance}
+      />
 
-        return (
-          <div className={classes.wrapper}>
-            <div className={classes.settingsWrapper}>
-              <IconButton className={classes.settingsIcon} onClick={() => setSettingsModalOpen(true)}>
-                <SettingsIcon />
-              </IconButton>
-            </div>
+      <Tabs
+        value={isWallet}
+        onChange={(_, value) => setIsWallet(value)}
+        variant='fullWidth'
+        centered
+        indicatorColor="secondary"
+        textColor="secondary"
+        classes={{root: classes.navigation}}
+      >
+        <Tab component={Link} to={'/wallet'} icon={<WalletIcon />} label="Wallet" />
+        <Tab component={Link} to={'/store'} icon={<StoreIcon />} label="Store" />
+      </Tabs>
 
-            <SettingsModal
-              wallet={wallet}
-              creationTransactionHash={data.snowMoEntities[0].transactionHash}
-              resetDemo={resetDemo}
-              open={settingsModalOpen} onClose={() => setSettingsModalOpen(false)}
-            />
-
-            <Header
-              wallet={wallet} ein={ein}
-              snowflakeBalance={snowflakeBalance}
-            />
-
-            <Tabs
-              value={isWallet}
-              onChange={(_, value) => setIsWallet(value)}
-              variant='fullWidth'
-              centered
-              indicatorColor="secondary"
-              textColor="secondary"
-              classes={{root: classes.navigation}}
-            >
-              <Tab component={Link} to={'/wallet'} icon={<WalletIcon />} label="Wallet" />
-              <Tab component={Link} to={'/store'} icon={<StoreIcon />} label="Store" />
-            </Tabs>
-
-            {isWallet === 0
-              ? (
-                <SendTo
-                  wallet={wallet} ein={ein} maxEIN={maxEIN} snowflakeBalance={snowflakeBalance}
-                  currentTransactionHash={currentTransactionHash}
-                  setCurrentTransactionHash={setCurrentTransactionHash}
-                />
-              )
-              : (
-                <BuyFrom
-                  wallet={wallet} ein={ein} snowflakeBalance={snowflakeBalance}
-                  amountPurchased={data.snowMoWithdrawFromVias.length}
-                  currentTransactionHash={currentTransactionHash}
-                  setCurrentTransactionHash={setCurrentTransactionHash}
-                />
-              )
-            }
-            <Logs ein={ein} />
-
-            <Snackbar
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'left',
-              }}
-              open={!!currentTransactionHash}
-              message={<span>Waiting on Transaction...</span>}
-              action={[
-                <Button
-                  component='a' target='_blank' href={getEtherscanLink(context.networkId, 'transaction', currentTransactionHash)}
-                  key="etherscan" size="small" color='secondary'
-                >
-                  Link
-                </Button>
-              ]}
-            />
-          </div>
+      {isWallet === 0
+        ? (
+          <SendTo
+            wallet={wallet} ein={ein} maxEIN={maxEIN} snowflakeBalance={snowflakeBalance}
+            currentTransactionHash={currentTransactionHash}
+            setCurrentTransactionHash={setCurrentTransactionHash}
+          />
         )
-     }}
-    </Query>
+        : (
+          <BuyFrom
+            wallet={wallet} ein={ein} snowflakeBalance={snowflakeBalance}
+            currentTransactionHash={currentTransactionHash}
+            setCurrentTransactionHash={setCurrentTransactionHash}
+          />
+        )
+      }
+      <Logs ein={ein} />
+
+      <Snackbar
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        open={!!currentTransactionHash}
+        message={<span>Waiting on Transaction...</span>}
+        action={[
+          <Button
+            component='a' target='_blank' href={getEtherscanLink(context.networkId, 'transaction', currentTransactionHash)}
+            key="etherscan" size="small" color='secondary'
+          >
+            Link
+          </Button>
+        ]}
+      />
+    </div>
   )
 }

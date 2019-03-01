@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react'
+import { gql } from 'apollo-boost'
+import { Query } from 'react-apollo'
 import Button from '@material-ui/core/Button'
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
@@ -50,8 +52,16 @@ const useStyles = makeStyles({
   }
 })
 
+const LOGS_QUERY = gql`
+  query couchesBought {
+    snowMoWithdrawFromVias(where: { einFrom: 625 }) {
+      id
+    }
+  }
+`
+
 export default function BuyFrom ({
-  wallet, ein, amountPurchased, snowflakeBalance, currentTransactionHash, setCurrentTransactionHash
+  wallet, ein, snowflakeBalance, currentTransactionHash, setCurrentTransactionHash
 }) {
   const classes = useStyles()
 
@@ -125,102 +135,114 @@ export default function BuyFrom ({
   }
 
   return (
-    <>
-      <div className={classes.title}>
-        <Typography variant='h5' align='center' >
-          Dai-llar General
-        </Typography>
-      </div>
+    <Query query={LOGS_QUERY}>
+      {({ data, error, loading }) => {
+        if (error) console.error(error)
+        console.log(loading)
+        console.log(data)
 
-      <div className={classes.ownedCount}>
-        {Number.isInteger(amountPurchased) && amountPurchased >= 1 && (
-          <Typography variant='body2' align='center'>
-            Congratulations! You're the proud owner of {amountPurchased} Dai-llar General {amountPurchased === 1 ? 'couch' : 'couches'}!
-          </Typography>
-        )}
-      </div>
+        const amountPurchased = (error || loading || !data.snowMoWithdrawFromVias) ? 0 : data.snowMoWithdrawFromVias.length
 
-      <div className={classes.couchWrapper}>
-        <img src={couch} alt="Couch" className={classes.couch} />
-      </div>
-
-      <div className={classes.couchPriceWrapper}>
-        <Balances type='DAI' balance={1} showBadge={amountPurchased === 0} />
-      </div>
-
-      {Number.isInteger(amountPurchased) && (
-        <>
-          <Typography variant='body1' align='center' >
-            Welcome to the Dai-llar General! For just 1 DAI, you can purchase an exclusive digital couch. It looks like you only have HYDRO, but that's ok. Thanks to <a href='https://uniswap.io/' target='_blank' rel='noopener noreferrer'>Uniswap</a> and <a href='https://erc1484.org/' target='_blank' rel='noopener noreferrer'>ERC1484</a>, we can instantly transfer your HYDRO into DAI.
-          </Typography>
-
-          <div className={classes.couchPriceWrapper}>
-            {hydroRequired && (
-              <div className={classes.flexed}>
-                <Balances
-                  type='Hydro' balance={utils.commify(Math.round(Number(utils.formatUnits(roundAmount(hydroRequired), 18))))} showBadge={false}
-                />
-              </div>
-            )}
-
-            <div className={classes.flexed}>
-              <TransactionController
-                method={method}
-                onTransactionHash={setCurrentTransactionHash}
-              >
-                {(transactionState, transactionControllers) => {
-                  switch (transactionState) {
-                    case 'unsent': {
-                      return (
-                        <Button
-                          disabled={!canSend}
-                          variant='contained' color='secondary'
-                          onClick={transactionControllers.sendTransaction}
-                        >
-                          Buy
-                        </Button>
-                      )
-                    }
-                    case 'waitingOnTransactionHash':
-                    case 'waitingOnConfirmation': {
-                      return (
-                        <Button
-                          disabled={true}
-                          variant='contained' color='secondary'
-                        >
-                          Purchasing...
-                        </Button>
-                      )
-                    }
-                    case 'receipt': {
-                      return (
-                        <Button
-                          variant='contained' color='secondary'
-                          onClick={transactionControllers.resetTransaction}
-                        >
-                          Success! Buy another?
-                        </Button>
-                      )
-                    }
-                    case 'error': {
-                      return (
-                        <Button
-                          variant='contained' color='secondary'
-                          onClick={transactionControllers.resetTransaction}
-                        >
-                          Error. Try again?
-                        </Button>
-                      )
-                    }
-                    default:
-                      return null
-                  }
-                }}
-              </TransactionController>
+        return (
+          <>
+            <div className={classes.title}>
+              <Typography variant='h5' align='center' >
+                Dai-llar General
+              </Typography>
             </div>
-          </div>
-        </>
-      )}
-    </>
+
+            <div className={classes.ownedCount}>
+              {Number.isInteger(amountPurchased) && amountPurchased >= 1 && (
+                <Typography variant='body2' align='center'>
+                  Congratulations! You're the proud owner of {amountPurchased} Dai-llar General {amountPurchased === 1 ? 'couch' : 'couches'}!
+                </Typography>
+              )}
+            </div>
+
+            <div className={classes.couchWrapper}>
+              <img src={couch} alt="Couch" className={classes.couch} />
+            </div>
+
+            <div className={classes.couchPriceWrapper}>
+              <Balances type='DAI' balance={1} showBadge={amountPurchased === 0} />
+            </div>
+
+            {Number.isInteger(amountPurchased) && (
+              <>
+                <Typography variant='body1' align='center' >
+                  Welcome to the Dai-llar General! For just 1 DAI, you can purchase an exclusive digital couch. It looks like you only have HYDRO, but that's ok. Thanks to <a href='https://uniswap.io/' target='_blank' rel='noopener noreferrer'>Uniswap</a> and <a href='https://erc1484.org/' target='_blank' rel='noopener noreferrer'>ERC1484</a>, we can instantly transfer your HYDRO into DAI.
+                </Typography>
+
+                <div className={classes.couchPriceWrapper}>
+                  {hydroRequired && (
+                    <div className={classes.flexed}>
+                      <Balances
+                        type='Hydro' balance={utils.commify(Math.round(Number(utils.formatUnits(roundAmount(hydroRequired), 18))))} showBadge={false}
+                      />
+                    </div>
+                  )}
+
+                  <div className={classes.flexed}>
+                    <TransactionController
+                      method={method}
+                      onTransactionHash={setCurrentTransactionHash}
+                    >
+                      {(transactionState, transactionControllers) => {
+                        switch (transactionState) {
+                          case 'unsent': {
+                            return (
+                              <Button
+                                disabled={!canSend}
+                                variant='contained' color='secondary'
+                                onClick={transactionControllers.sendTransaction}
+                              >
+                                Buy
+                              </Button>
+                            )
+                          }
+                          case 'waitingOnTransactionHash':
+                          case 'waitingOnConfirmation': {
+                            return (
+                              <Button
+                                disabled={true}
+                                variant='contained' color='secondary'
+                              >
+                                Purchasing...
+                              </Button>
+                            )
+                          }
+                          case 'receipt': {
+                            return (
+                              <Button
+                                variant='contained' color='secondary'
+                                onClick={transactionControllers.resetTransaction}
+                              >
+                                Success! Buy another?
+                              </Button>
+                            )
+                          }
+                          case 'error': {
+                            return (
+                              <Button
+                                variant='contained' color='secondary'
+                                onClick={transactionControllers.resetTransaction}
+                              >
+                                Error. Try again?
+                              </Button>
+                            )
+                          }
+                          default:
+                            return null
+                        }
+                      }}
+                    </TransactionController>
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        )
+      }}
+    </Query>
   )
 }

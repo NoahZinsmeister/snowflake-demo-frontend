@@ -30,6 +30,8 @@ const etherscanTypes = {
   transaction: 'tx'
 }
 
+export const fromBlock = 3817457
+
 export const daillarGeneralAddress = '0x1111111111111111111111111111111111111111'
 
 export function getEtherscanLink(networkId, type, data) {  
@@ -121,7 +123,7 @@ export async function getEINDetails(library, ein) {
 
   async function getSnowMoSignupReceipt() {
     const filter = snowMoResolver.filters['SnowMoSignup'](Number(ein))
-    filter.fromBlock = 3749195
+    filter.fromBlock = fromBlock
 
     const log = await library.getLogs(filter)
 

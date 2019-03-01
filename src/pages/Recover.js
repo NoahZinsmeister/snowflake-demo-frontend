@@ -6,6 +6,7 @@ import Button from '@material-ui/core/Button';
 import { makeStyles } from '@material-ui/styles';
 import { ethers } from 'ethers'
 
+import { fromBlock } from '../utilities'
 import { useContract } from '../hooks'
 import { useWeb3Context } from 'web3-react';
 
@@ -53,14 +54,14 @@ export default function Recover({ setPrivateKeyAndCreationTransactionHash }) {
           .catch(() => null)
 
         const filter = snowMoResolver.filters['SnowMoSignup'](Number(ein))
-        filter.fromBlock = 3749195
+        filter.fromBlock = fromBlock
 
         const log = await context.library.getLogs(filter)
 
         if (log && log[0] && log[0].transactionHash) {
           setPrivateKeyAndCreationTransactionHash(input, log[0].transactionHash, 2)
         } else {
-          setPrivateKey({ value: input, error: null })
+          setPrivateKey({ value: input, error: 'Error. Please try again later.' })
         }
       } catch (error) {
         setPrivateKey({ value: input, error: 'Please enter a valid key.' })

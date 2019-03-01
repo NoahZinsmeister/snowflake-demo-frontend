@@ -14,8 +14,8 @@ import { ReactComponent as DaiLogo } from '../assets/dai.svg'
 import { ReactComponent as HydroLogo } from '../assets/hydro.svg'
 
 const LOGS_QUERY = gql`
-  query allLogs($ein: BigInt!) {
-    snowMoTransfersTo: snowMoTransfers(where: { einTo: $ein }) {
+  query allLogs {
+    snowMoTransfersTo: snowMoTransfers(where: { einTo: 625 }) {
       einFrom
       einTo
       amount
@@ -24,7 +24,7 @@ const LOGS_QUERY = gql`
       blockNumber
       timestamp
     }
-    snowMoTransfersFrom: snowMoTransfers(where: { einFrom: $ein }) {
+    snowMoTransfersFrom: snowMoTransfers(where: { einFrom: 625 }) {
       einFrom
       einTo
       amount
@@ -33,7 +33,7 @@ const LOGS_QUERY = gql`
       blockNumber
       timestamp
     }
-    snowMoWithdrawFromVias(where: { einFrom: $ein }) {
+    snowMoWithdrawFromVias(where: { einFrom: 625 }) {
       einFrom
       to
       via
@@ -148,7 +148,6 @@ export default function Logs ({ ein }) {
   return (
     <Query
       query={LOGS_QUERY}
-      variables={{ ein }}
     >
       {({ data, error, loading }) => {
         if (loading)
